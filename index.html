@@ -333,6 +333,12 @@
                         </button>
                     </li>
                     <li>
+                        <button id="nav-privacy" class="font-semibold font-heading"> <!-- Added id="nav-privacy" here -->
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Ad Privacy Policy</span>
+                        </button>
+                    </li>
+                    <li>
                         <button id="nav-logout" class="font-semibold font-heading bg-red-600 hover:bg-red-700 text-white">
                             <i class="fas fa-sign-out-alt"></i>
                             <span>Logout</span>
@@ -533,7 +539,8 @@
         // --- Firebase Data Operations ---
         // This appId is dynamically provided by the Canvas environment.
         // If running outside Canvas, you would hardcode your Firebase Project ID here.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // For GitHub Pages deployment, we are now hardcoding the Firebase Project ID.
+        const appId = "adwatchrewardsapp"; // Your Firebase Project ID
 
         async function getUserProfile(uid) {
             const userDocRef = doc(db, `artifacts/${appId}/users/${uid}/profile/data`);
@@ -1369,7 +1376,7 @@
             `;
             document.querySelectorAll('.ad-card').forEach(card => {
                 card.addEventListener('click', (e) => {
-                    const adIndex = parseInt(e.currentTarget.dataset.adIndex);
+                    const adIndex = parseInt(e.currentTarget.dataset.ad-index);
                     handleWatchAd(adIndex);
                 });
             });
@@ -1874,21 +1881,17 @@
 
         // --- Initialize App ---
         document.addEventListener('DOMContentLoaded', async () => {
-            // Initialize Firebase
-            // The __firebase_config variable is provided by the Canvas environment.
-            // If running outside Canvas, you would replace this with your actual firebaseConfig object:
-            /*
+            // Initialize Firebase with your specific details
             const firebaseConfig = {
-                apiKey: "YOUR_API_KEY",
-                authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-                projectId: "YOUR_PROJECT_ID",
-                storageBucket: "YOUR_PROJECT_ID.appspot.com",
-                messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-                appId: "YOUR_APP_ID",
-                measurementId: "YOUR_MEASUREMENT_ID"
+                apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
+                authDomain: "adwatchrewardsapp.firebaseapp.com",
+                projectId: "adwatchrewardsapp",
+                storageBucket: "adwatchrewardsapp.firebasestorage.app",
+                messagingSenderId: "782268735936",
+                appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
+                measurementId: "G-4NG2564HTK"
             };
-            */
-            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            
             app = initializeApp(firebaseConfig);
             db = getFirestore(app);
             auth = getAuth(app);
@@ -1956,21 +1959,20 @@
                 }
             });
 
-            // Initial sign-in with custom token if available, otherwise anonymously
-            // This is specific to the Canvas environment for initial authentication.
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            // Initial sign-in logic for external deployment
+            // If running outside Canvas, we don't have __initial_auth_token.
+            // We'll try to sign in anonymously if no user is already authenticated.
+            // The onAuthStateChanged listener will then handle rendering the correct page.
+            if (!auth.currentUser) { // Check if a user is already authenticated (e.g., from a previous session)
                 try {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                    console.log("Signed in with custom token.");
-                } catch (error) {
-                    console.error("Error signing in with custom token, signing in anonymously:", error);
                     await signInAnonymously(auth);
+                } catch (error) {
+                    console.error("Error during initial anonymous sign-in:", error);
+                    // If anonymous sign-in fails, the onAuthStateChanged will still fire with null user,
+                    // leading to renderAuthPage().
                 }
-            } else {
-                // If no custom token (e.g., running outside Canvas initially), sign in anonymously.
-                // Or, if you want to force email/password login, you could remove this.
-                await signInAnonymously(auth);
             }
+
 
             // Setup navigation button listeners (these are static elements)
             document.getElementById('nav-dashboard').addEventListener('click', () => renderPage('dashboard'));
