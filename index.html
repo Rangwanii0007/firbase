@@ -281,6 +281,106 @@
             transform: translateY(-2px); /* Slight lift on hover */
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
+
+        /* Custom Popup Styles with 3D effect */
+        .custom-popup-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+
+        .custom-popup-content {
+            background-color: #1f2937; /* gray-800 */
+            padding: 2.5rem; /* Increased padding */
+            border-radius: 1rem; /* More rounded */
+            box-shadow:
+                0 25px 50px -12px rgba(0, 0, 0, 0.6), /* Deeper main shadow */
+                0 10px 20px -5px rgba(0, 0, 0, 0.4), /* Secondary shadow */
+                inset 0 0 15px rgba(255, 255, 255, 0.05); /* Inner light for depth */
+            text-align: center;
+            max-width: 32rem; /* Wider */
+            width: 90%;
+            border: 2px solid; /* Thicker border */
+            animation: fadeIn 0.4s ease-out; /* Slightly slower fade in */
+            position: relative; /* For icon positioning */
+            overflow: hidden; /* Ensure icon doesn't overflow */
+        }
+
+        .custom-popup-content.blue-border {
+            border-color: #3b82f6; /* blue-500 */
+            background: linear-gradient(145deg, #2a3544, #1a222c); /* Subtle gradient */
+        }
+        .custom-popup-content.yellow-border {
+            border-color: #f59e0b; /* amber-500 */
+            background: linear-gradient(145deg, #2a3544, #1a222c);
+        }
+        .custom-popup-content.green-border {
+            border-color: #22c55e; /* green-500 */
+            background: linear-gradient(145deg, #2a3544, #1a222c);
+        }
+
+        .custom-popup-icon {
+            font-size: 4rem; /* Larger icon */
+            margin-bottom: 1.5rem;
+            color: inherit; /* Inherit color from parent for thematic consistency */
+            text-shadow: 0 0 10px rgba(255,255,255,0.3); /* Icon glow */
+        }
+
+        .custom-popup-content.blue-border .custom-popup-icon { color: #3b82f6; }
+        .custom-popup-content.yellow-border .custom-popup-icon { color: #f59e0b; }
+        .custom-popup-content.green-border .custom-popup-icon { color: #22c55e; }
+
+        .custom-popup-title {
+            font-size: 2.25rem; /* text-4xl */
+            font-weight: 800; /* font-extrabold */
+            margin-bottom: 1.25rem;
+            color: #e5e7eb; /* gray-100 */
+            text-shadow: 0 2px 5px rgba(0,0,0,0.5); /* Text shadow for depth */
+        }
+        .custom-popup-message {
+            font-size: 1.25rem; /* text-xl */
+            color: #d1d5db; /* gray-200 */
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+        .custom-popup-button {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            font-weight: 700; /* font-bold */
+            padding: 0.9rem 2rem; /* Larger buttons */
+            border-radius: 0.6rem; /* More rounded */
+            transition: all 0.3s ease-in-out;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); /* Button shadow */
+        }
+        .custom-popup-button:hover {
+            background-color: #2563eb; /* blue-600 */
+            transform: translateY(-2px) scale(1.02); /* Slight lift and scale */
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        .custom-popup-button.green {
+            background-color: #22c55e;
+        }
+        .custom-popup-button.green:hover {
+            background-color: #16a34a;
+        }
+        .custom-popup-button.yellow {
+            background-color: #f59e0b;
+        }
+        .custom-popup-button.yellow:hover {
+            background-color: #d97706;
+        }
+
     </style>
 </head>
 <body>
@@ -363,45 +463,48 @@
         </div>
 
         <!-- Ad Completion Popup -->
-        <div id="ad-completion-popup" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-            <div class="bg-gray-900 p-8 rounded-xl shadow-2xl text-center max-w-md w-full border border-blue-600 text-gray-100">
-                <h3 class="text-3xl font-bold text-blue-400 mb-4 font-heading">Congratulations!</h3>
-                <p class="text-gray-300 text-lg mb-6">
+        <div id="ad-completion-popup" class="custom-popup-container hidden">
+            <div class="custom-popup-content blue-border">
+                <i class="fas fa-check-circle custom-popup-icon"></i>
+                <h3 class="custom-popup-title font-heading">Congratulations!</h3>
+                <p class="custom-popup-message">
                     You have watched all 30 ads for this session.
                     <br />Please wait <span class="font-semibold text-red-500"><span id="cooldown-hours">0</span>h <span id="cooldown-minutes">0</span>m <span id="cooldown-seconds">0</span>s</span> before watching more ads.
                 </p>
-                <button id="close-ad-completion-popup" class="mt-8 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-lg shadow-md transform hover:scale-105 transition duration-300 border border-blue-500 font-heading">
+                <button id="close-ad-completion-popup" class="custom-popup-button blue font-heading">
                     Got It!
                 </button>
             </div>
         </div>
 
         <!-- Task Completion Popup -->
-        <div id="task-completion-popup" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-            <div class="bg-gray-900 p-8 rounded-xl shadow-2xl text-center max-w-md w-full border border-yellow-600 text-gray-100">
-                <h3 class="text-3xl font-bold text-yellow-400 mb-4 font-heading">All Tasks Completed!</h3>
-                <p class="text-gray-300 text-lg mb-6">
+        <div id="task-completion-popup" class="custom-popup-container hidden">
+            <div class="custom-popup-content yellow-border">
+                <i class="fas fa-trophy custom-popup-icon"></i>
+                <h3 class="custom-popup-title font-heading">All Tasks Completed!</h3>
+                <p class="custom-popup-message">
                     You have completed all available tasks for this session.
                     <br />Please wait <span class="font-semibold text-red-500"><span id="task-cooldown-popup-hours">0</span>h <span id="task-cooldown-popup-minutes">0</span>m <span id="task-cooldown-popup-seconds">0</span>s</span> before new tasks are available.
                 </p>
-                <button id="close-task-completion-popup" class="mt-8 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-bold py-3 px-6 rounded-lg shadow-md transform hover:scale-105 transition duration-300 border border-yellow-500 font-heading">
+                <button id="close-task-completion-popup" class="custom-popup-button yellow font-heading">
                     Got It!
                 </button>
             </div>
         </div>
 
         <!-- Withdrawal Confirmation Popup -->
-        <div id="withdrawal-confirmation-popup" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-            <div class="bg-gray-900 p-8 rounded-xl shadow-2xl text-center max-w-md w-full border border-green-600 text-gray-100">
-                <h3 class="text-3xl font-bold text-green-400 mb-4 font-heading">Withdrawal Submitted!</h3>
-                <p class="text-gray-300 text-lg mb-6">
+        <div id="withdrawal-confirmation-popup" class="custom-popup-container hidden">
+            <div class="custom-popup-content green-border">
+                <i class="fas fa-dollar-sign custom-popup-icon"></i>
+                <h3 class="custom-popup-title font-heading">Withdrawal Submitted!</h3>
+                <p class="custom-popup-message">
                     Your request to withdraw <span class="font-semibold text-green-500" id="withdrawal-amount-display"></span> via <span class="font-semibold text-green-500" id="withdrawal-method-display"></span> has been successfully submitted.
                     <br/>It will be automatically sent to your wallet/account.
                 </p>
                 <p class="text-gray-400 text-md">
                     We will process your request shortly.
                 </p>
-                <button id="close-withdrawal-popup" class="mt-8 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-3 px-6 rounded-lg shadow-md transform hover:scale-105 transition duration-300 border border-green-500 font-heading">
+                <button id="close-withdrawal-popup" class="custom-popup-button green font-heading">
                     Okay
                 </button>
             </div>
@@ -438,7 +541,7 @@
     <script type="module">
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, increment, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global Firebase instances
@@ -599,8 +702,8 @@
         // --- Authentication Functions ---
         async function loginUser(email, password) {
             try {
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                console.log("Logged in:", userCredential.user.uid);
+                await signInWithEmailAndPassword(auth, email, password);
+                // The onAuthStateChanged listener will handle the redirection to dashboard
                 showAlert("Success", "Logged in successfully!", "success");
             } catch (error) {
                 console.error("Login error:", error);
@@ -641,8 +744,9 @@
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
 
-                showAlert("Success", "Account created successfully! You can now log in.", "success");
-                renderPage('auth'); // Go back to login page
+                // The onAuthStateChanged listener will handle the redirection to dashboard
+                showAlert("Success", "Account created successfully! Redirecting to dashboard...", "success");
+                // Removed renderPage('auth') here to allow onAuthStateChanged to handle redirection
             } catch (error) {
                 console.error("Account creation error:", error);
                 showAlert("Account Creation Failed", error.message, "error");
@@ -690,8 +794,8 @@
                         window.history.replaceState({}, document.title, window.location.pathname);
                     }
                 }
-
-                showAlert("Guest Login", "Logged in as guest. Your progress will be saved.", "info");
+                // The onAuthStateChanged listener will handle the redirection to dashboard
+                showAlert("Guest Login", "Logged in as guest. Your progress will be saved. Redirecting to dashboard...", "info");
             } catch (error) {
                 console.error("Anonymous login error:", error);
                 showAlert("Guest Login Failed", error.message, "error");
@@ -709,7 +813,7 @@
                 spinCooldownEndTime = 0;
                 tasksCompleted = 0;
                 taskCooldownEndTime = 0;
-                referralCode = '';
+            referralCode = '';
                 totalReferrals = 0;
                 referralEarnings = 0;
                 savedWithdrawalMethod = null;
@@ -721,6 +825,17 @@
             } catch (error) {
                 console.error("Logout error:", error);
                 showAlert("Logout Failed", error.message, "error");
+            }
+        }
+
+        // New: Forgot Password function
+        async function handleForgotPassword(email) {
+            try {
+                await sendPasswordResetEmail(auth, email);
+                showAlert("Password Reset", "If an account with that email exists, a password reset link has been sent to your email.", "success");
+            } catch (error) {
+                console.error("Password reset error:", error);
+                showAlert("Password Reset Failed", error.message, "error");
             }
         }
 
@@ -1225,7 +1340,12 @@
                         type: 'automatic' // Mark as automatic withdrawal
                     });
 
-                    showAlert("Automatic Withdrawal!", `An automatic withdrawal of $${amountToWithdraw.toFixed(2)} via ${savedWithdrawalMethod} has been processed. Your balance is now $0.00.`, "success");
+                    // Update the withdrawal confirmation popup with dynamic data
+                    document.getElementById('withdrawal-amount-display').textContent = `$${amountToWithdraw.toFixed(2)}`;
+                    document.getElementById('withdrawal-method-display').textContent = savedWithdrawalMethod.toUpperCase();
+                    document.getElementById('withdrawal-confirmation-popup').classList.remove('hidden');
+
+                    // showAlert("Automatic Withdrawal!", `An automatic withdrawal of $${amountToWithdraw.toFixed(2)} via ${savedWithdrawalMethod} has been processed. Your balance is now $0.00.`, "success");
                     // Update local state immediately for UI consistency
                     balance = 0; // Directly update global variable, onSnapshot will sync later
                     lastAutomaticWithdrawalTime = now;
@@ -1319,7 +1439,7 @@
             document.getElementById('app-header').classList.add('hidden'); // Hide header on auth page
 
             mainContent.innerHTML = `
-                <div class="p-6 bg-gray-800 rounded-xl shadow-2xl border border-gray-700 text-gray-100 max-w-md w-full">
+                <div class="p-6 bg-gray-800 rounded-xl shadow-2xl border border-gray-700 text-gray-100 max-w-md w-full mx-auto">
                     <h2 class="text-3xl font-extrabold text-blue-400 mb-6 text-center font-heading">Welcome to Ad watch Rewards</h2>
                     <p class="text-gray-300 mb-8 text-center">Login or create an account to start earning!</p>
 
@@ -1354,6 +1474,9 @@
                             Continue as Guest
                         </button>
                     </form>
+                    <div class="text-center mt-4">
+                        <a href="#" id="forgot-password-link" class="text-blue-400 hover:text-blue-300 text-sm font-semibold font-heading transition duration-300">Forgot Password?</a>
+                    </div>
                 </div>
             `;
 
@@ -1369,6 +1492,15 @@
                 createAccount(email, password);
             });
             document.getElementById('guest-login-button').addEventListener('click', loginAsGuest);
+            document.getElementById('forgot-password-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                const email = document.getElementById('auth-email').value;
+                if (email) {
+                    handleForgotPassword(email);
+                } else {
+                    showAlert("Email Required", "Please enter your email address in the email field above to reset your password.", "warning");
+                }
+            });
 
             // Show referral claim popup if activeReferralCode is present
             if (activeReferralCode) {
