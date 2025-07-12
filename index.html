@@ -333,7 +333,7 @@
                         </button>
                     </li>
                     <li>
-                        <button id="nav-privacy" class="font-semibold font-heading"> <!-- Added id="nav-privacy" here -->
+                        <button id="nav-privacy" class="font-semibold font-heading">
                             <i class="fas fa-shield-alt"></i>
                             <span>Ad Privacy Policy</span>
                         </button>
@@ -416,13 +416,30 @@
         <div id="live-notification-left" class="hidden fixed top-4 left-4 bg-purple-700 text-white p-4 rounded-lg shadow-xl z-50 max-w-xs border border-purple-500">
             <p class="font-semibold text-sm" id="live-notification-left-message"></p>
         </div>
+
+        <!-- Referral Claim Popup -->
+        <div id="referral-claim-popup" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+            <div class="bg-gray-900 p-8 rounded-xl shadow-2xl text-center max-w-md w-full border border-green-600 text-gray-100">
+                <h3 class="text-3xl font-bold text-green-400 mb-4 font-heading">Invitation Received!</h3>
+                <p class="text-gray-300 text-lg mb-6">
+                    You've been invited by <span class="font-semibold text-yellow-400" id="invited-by-code"></span>!
+                    Create an account or log in to claim your <span class="font-bold text-green-500">$5.00</span> welcome bonus.
+                </p>
+                <button id="claim-invitation-button" class="mt-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-3 px-6 rounded-lg shadow-md transform hover:scale-105 transition duration-300 border border-green-500 font-heading">
+                    Claim My Bonus
+                </button>
+                <button id="close-referral-claim-popup" class="mt-4 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-3 px-6 rounded-lg shadow-md transform hover:scale-105 transition duration-300 border border-gray-500 font-heading">
+                    No Thanks
+                </button>
+            </div>
+        </div>
     </div>
 
     <script type="module">
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, increment, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, increment, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global Firebase instances
         let app;
@@ -438,14 +455,26 @@
         let spinCooldownEndTime = 0; // For spin wheel
         let tasksCompleted = 0; // New: Tasks completed in current session
         let taskCooldownEndTime = 0; // New: Cooldown for tasks
-        let referralCode = ''; // New: User's unique referral code
-        let totalReferrals = 0; // New: Count of successful referrals
-        let referralEarnings = 0; // New: Total earnings from referrals
-        let referralCooldownEndTime = 0; // New: Cooldown for simulating referrals
+        let referralCode = ''; // User's unique referral code
+        let totalReferrals = 0; // Count of successful referrals
+        let referralEarnings = 0; // Total earnings from referrals
+        let referralCooldownEndTime = 0; // Cooldown for simulating referrals (now for referrer reward)
+
+        // New withdrawal state
+        let savedWithdrawalMethod = null;
+        let savedWithdrawalAddress = null;
+        let lastAutomaticWithdrawalTime = 0;
+        const MIN_WITHDRAWAL_AMOUNT = 500; // Minimum balance for automatic withdrawal
+        const AUTO_WITHDRAWAL_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
         let currentPage = 'auth'; // Start on auth page
         let selectedCurrency = 'USD';
-        let withdrawalDetails = null;
+        let withdrawalDetails = null; // For the withdrawal confirmation popup
+
+        let activeReferralCode = null; // Stores the referral code from the URL
+
+        // IMPORTANT: Replace with your actual GitHub Pages URL or custom domain URL
+        const BASE_APP_URL = "https://your-username.github.io/your-repo-name/"; // Example: "https://myusername.github.io/my-ad-app/"
 
         // Ad links (used for both Watch Ads and Tasks)
         const adLinks = [
@@ -523,8 +552,7 @@
             { id: 6, title: "Follow us on social media", description: "Follow our official page on a popular social platform.", adLink: adLinks[5] },
             { id: 7, title: "Write a short review", description: "Provide a brief review for a given product or service.", adLink: adLinks[6] },
             { id: 8, title: "Play a mini-game", description: "Achieve a certain score in a simple browser game.", adLink: adLinks[7] },
-            { id: 9, title: "Refer a friend (simulated)", description: "Simulate referring a friend to our platform.", adLink: adLinks[8] },
-            { id: 10, title: "Complete a captcha challenge", description: "Prove you're not a robot by solving a captcha.", adLink: adLinks[9] }
+            { id: 9, title: "Complete a captcha challenge", description: "Prove you're not a robot by solving a captcha.", adLink: adLinks[9] }
         ];
 
         // Hardcoded exchange rates for demonstration (In a real app, use a crypto API)
@@ -537,9 +565,6 @@
         };
 
         // --- Firebase Data Operations ---
-        // This appId is dynamically provided by the Canvas environment.
-        // If running outside Canvas, you would hardcode your Firebase Project ID here.
-        // For GitHub Pages deployment, we are now hardcoding the Firebase Project ID.
         const appId = "adwatchrewardsapp"; // Your Firebase Project ID
 
         async function getUserProfile(uid) {
@@ -590,7 +615,7 @@
                 console.log("Account created:", uid);
 
                 // Initialize user profile in Firestore
-                const newReferralCode = generateUniqueId();
+                const newReferralCode = generateReferralCode(uid); // Generate code with UID
                 await createOrUpdateUserProfile(uid, {
                     balance: 0,
                     adsWatched: 0,
@@ -601,11 +626,22 @@
                     referralCode: newReferralCode,
                     totalReferrals: 0,
                     referralEarnings: 0,
-                    referralCooldownEndTime: 0,
+                    referredBy: null, // New field to track if this user was referred
+                    withdrawalMethod: null, // New: Default withdrawal method
+                    withdrawalAddress: null, // New: Default withdrawal address
+                    lastAutomaticWithdrawalTime: 0, // New: Timestamp of last automatic withdrawal
                     createdAt: Date.now()
                 });
+
+                // Check and apply referral if an active referral code is present
+                if (activeReferralCode) {
+                    await claimReferralBonus(activeReferralCode, uid);
+                    activeReferralCode = null; // Clear after claiming
+                    // Remove ref parameter from URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+
                 showAlert("Success", "Account created successfully! You can now log in.", "success");
-                // Optionally log in the user directly or redirect to login
                 renderPage('auth'); // Go back to login page
             } catch (error) {
                 console.error("Account creation error:", error);
@@ -616,14 +652,12 @@
         async function loginAsGuest() {
             try {
                 const userCredential = await signInAnonymously(auth);
-                console.log("Signed in anonymously:", userCredential.user.uid);
-                showAlert("Guest Login", "Logged in as guest. Data will be saved locally.", "info");
-                // For anonymous users, we'll still use Firestore but their data won't persist across devices.
-                // We'll still create a profile for them.
                 const uid = userCredential.user.uid;
+                console.log("Signed in anonymously:", uid);
+
                 const userProfile = await getUserProfile(uid);
                 if (!userProfile) {
-                     const newReferralCode = generateUniqueId();
+                     const newReferralCode = generateReferralCode(uid); // Generate code with UID
                      await createOrUpdateUserProfile(uid, {
                         balance: 0,
                         adsWatched: 0,
@@ -634,10 +668,30 @@
                         referralCode: newReferralCode,
                         totalReferrals: 0,
                         referralEarnings: 0,
-                        referralCooldownEndTime: 0,
+                        referredBy: null, // New field
+                        withdrawalMethod: null, // New: Default withdrawal method
+                        withdrawalAddress: null, // New: Default withdrawal address
+                        lastAutomaticWithdrawalTime: 0, // New: Timestamp of last automatic withdrawal
                         createdAt: Date.now()
                     });
+                     // Check and apply referral if an active referral code is present for new guest
+                    if (activeReferralCode) {
+                        await claimReferralBonus(activeReferralCode, uid);
+                        activeReferralCode = null; // Clear after claiming
+                        // Remove ref parameter from URL
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                } else {
+                    // If existing guest, check if they were already referred.
+                    // If not, and there's an active referral code, apply it.
+                    if (activeReferralCode && !userProfile.referredBy) {
+                        await claimReferralBonus(activeReferralCode, uid);
+                        activeReferralCode = null;
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
                 }
+
+                showAlert("Guest Login", "Logged in as guest. Your progress will be saved.", "info");
             } catch (error) {
                 console.error("Anonymous login error:", error);
                 showAlert("Guest Login Failed", error.message, "error");
@@ -658,7 +712,9 @@
                 referralCode = '';
                 totalReferrals = 0;
                 referralEarnings = 0;
-                referralCooldownEndTime = 0;
+                savedWithdrawalMethod = null;
+                savedWithdrawalAddress = null;
+                lastAutomaticWithdrawalTime = 0;
                 userId = null;
                 isAuthReady = false;
                 renderPage('auth');
@@ -668,9 +724,91 @@
             }
         }
 
-        // Function to generate a simple unique ID (for referral code)
-        function generateUniqueId() {
-            return 'REF-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+        // Function to generate a unique referral code embedding the UID
+        function generateReferralCode(uid) {
+            // Use a portion of the UID and a random string for uniqueness and traceability
+            return `REF-${uid.substring(0, 8)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        }
+
+        // Function to extract UID from a referral code
+        function getUidFromReferralCode(refCode) {
+            const parts = refCode.split('-');
+            if (parts.length === 3 && parts[0] === 'REF') {
+                // Reconstruct a potential UID prefix. This is NOT the full UID, just a hint.
+                // We'll verify against the actual user profile.
+                return parts[1];
+            }
+            return null;
+        }
+
+        // Function to claim referral bonus
+        async function claimReferralBonus(referrerCode, newUserId) {
+            const referralBonusAmount = 5.00; // Bonus for the new user
+            const referrerRewardAmount = 10.00; // Reward for the referrer
+
+            try {
+                const newUserProfile = await getUserProfile(newUserId);
+                if (!newUserProfile) {
+                    console.warn("Attempted to claim referral for non-existent new user profile:", newUserId);
+                    return;
+                }
+                if (newUserProfile.referredBy) {
+                    console.log("User already referred:", newUserId);
+                    return; // Already referred, prevent re-claiming
+                }
+
+                // Get referrer's UID from the code (first 8 chars of UID in the code)
+                const potentialReferrerUidPrefix = getUidFromReferralCode(referrerCode);
+                if (!potentialReferrerUidPrefix) {
+                    showAlert("Invalid Referral", "The referral code is invalid.", "error");
+                    return;
+                }
+
+                // Attempt to find the actual referrer's profile by querying all profiles for the referralCode
+                // This is a simplified approach. In a large app, you'd use a Firestore index for `referralCode`.
+                // For this example, we'll iterate (less efficient but avoids index setup for now).
+                let referrerUid = null;
+                let referrerProfile = null;
+
+                // Querying all user profiles to find the referrer by their referralCode
+                // Note: For a large number of users, this approach can be inefficient.
+                // A Firestore query with `where("referralCode", "==", referrerCode)` would be better
+                // but requires a composite index. For this demo, iterating is acceptable.
+                const usersCollectionRef = collection(db, `artifacts/${appId}/users`);
+                const userDocsSnap = await getDocs(usersCollectionRef);
+                for (const userDoc of userDocsSnap.docs) {
+                    const profileDataRef = doc(db, `artifacts/${appId}/users/${userDoc.id}/profile/data`);
+                    const profileSnap = await getDoc(profileDataRef);
+                    if (profileSnap.exists() && profileSnap.data().referralCode === referrerCode) {
+                        referrerUid = userDoc.id;
+                        referrerProfile = profileSnap.data();
+                        break; // Found the referrer, exit loop
+                    }
+                }
+
+                if (!referrerUid || referrerUid === newUserId) {
+                    showAlert("Invalid Referral", "The referral code is invalid or you cannot refer yourself.", "error");
+                    return;
+                }
+
+                // 1. Reward the new user
+                await updateUserData(newUserId, {
+                    balance: increment(parseFloat(referralBonusAmount.toFixed(2))),
+                    referredBy: referrerCode // Mark this user as referred
+                });
+                showAlert("Bonus Claimed!", `You received a $${referralBonusAmount.toFixed(2)} welcome bonus!`, "success");
+
+                // 2. Reward the referrer
+                await updateUserData(referrerUid, {
+                    totalReferrals: increment(1),
+                    referralEarnings: increment(parseFloat(referrerRewardAmount.toFixed(2)))
+                });
+                showAlert("Referral Success", `Your friend claimed their bonus! You earned $${referrerRewardAmount.toFixed(2)}.`, "success");
+
+            } catch (error) {
+                console.error("Error claiming referral bonus:", error);
+                showAlert("Referral Failed", "Could not claim referral bonus. Please try again.", "error");
+            }
         }
 
         // --- Custom Alert Popup Function ---
@@ -784,10 +922,9 @@
                 }
             }
 
-            // Update referral cooldown display
+            // Referral cooldown is now for the referrer's earnings, not a simulation button
             const referralTimeLeft = calculateTimeLeft(referralCooldownEndTime);
             const referralCooldownMessage = document.getElementById('referral-cooldown-message');
-            const simulateReferralButton = document.getElementById('simulate-referral-button');
             const referralCooldownHours = document.getElementById('referral-cooldown-hours');
             const referralCooldownMinutes = document.getElementById('referral-cooldown-minutes');
             const referralCooldownSeconds = document.getElementById('referral-cooldown-seconds');
@@ -796,16 +933,33 @@
             if (referralCooldownMinutes) referralCooldownMinutes.textContent = referralTimeLeft.minutes;
             if (referralCooldownSeconds) referralCooldownSeconds.textContent = referralTimeLeft.seconds;
 
-            if (referralCooldownMessage && simulateReferralButton) {
+            if (referralCooldownMessage) {
                 if (referralTimeLeft.isActive) {
                     referralCooldownMessage.classList.remove('hidden');
-                    simulateReferralButton.disabled = true;
                 } else {
                     referralCooldownMessage.classList.add('hidden');
-                    simulateReferralButton.disabled = false;
                     if (referralCooldownEndTime > 0) { // Only reset if it was active and just ended
                         updateUserData(userId, { referralCooldownEndTime: 0 });
                     }
+                }
+            }
+
+            // Update automatic withdrawal cooldown display
+            const autoWithdrawalTimeLeft = calculateTimeLeft(lastAutomaticWithdrawalTime + AUTO_WITHDRAWAL_COOLDOWN_MS);
+            const autoWithdrawalCooldownMessage = document.getElementById('auto-withdrawal-cooldown-message');
+            const autoWithdrawalCooldownHours = document.getElementById('auto-withdrawal-cooldown-hours');
+            const autoWithdrawalCooldownMinutes = document.getElementById('auto-withdrawal-cooldown-minutes');
+            const autoWithdrawalCooldownSeconds = document.getElementById('auto-withdrawal-cooldown-seconds');
+
+            if (autoWithdrawalCooldownHours) autoWithdrawalCooldownHours.textContent = autoWithdrawalTimeLeft.hours;
+            if (autoWithdrawalCooldownMinutes) autoWithdrawalCooldownMinutes.textContent = autoWithdrawalTimeLeft.minutes;
+            if (autoWithdrawalCooldownSeconds) autoWithdrawalCooldownSeconds.textContent = autoWithdrawalTimeLeft.seconds;
+
+            if (autoWithdrawalCooldownMessage) {
+                if (autoWithdrawalTimeLeft.isActive) {
+                    autoWithdrawalCooldownMessage.classList.remove('hidden');
+                } else {
+                    autoWithdrawalCooldownMessage.classList.add('hidden');
                 }
             }
         }
@@ -899,7 +1053,8 @@
             }
 
             const watchDuration = 10000; // 10 seconds
-            const earnAmount = (Math.random() * (0.10 - 0.05) + 0.05); // Random between $0.05 and $0.10
+            // Changed earnAmount to be between $1 and $10
+            const earnAmount = (Math.random() * (10 - 1) + 1); // Random between $1 and $10
 
             window.open(adLinks[adIndex], '_blank');
             showAlert("Watching Ad", `Watching ad ${adIndex + 1}... Please wait 10 seconds.`, "info");
@@ -1044,81 +1199,76 @@
             }, 10000); // 10 seconds delay for task ad viewing
         }
 
-        // Handle simulating a referral
-        async function handleSimulateReferral() {
-            if (!userId) {
-                showAlert("Authentication Required", "Please log in to simulate referrals.", "error");
-                return;
-            }
-            if (referralCooldownEndTime > Date.now()) {
-                const timeLeft = calculateTimeLeft(referralCooldownEndTime);
-                showAlert("Cooldown Active", `Referral simulation cooldown active. Please wait ${timeLeft.hours}h ${timeLeft.minutes}m ${timeLeft.seconds}s.`, "warning");
-                return;
-            }
+        // --- New: Automatic Withdrawal Logic ---
+        async function checkAndProcessAutomaticWithdrawal() {
+            if (!userId || !isAuthReady) return; // Ensure user is logged in and data is ready
 
-            const referralAmount = 10.00; // $10 per referral
+            const now = Date.now();
+            const timeSinceLastWithdrawal = now - lastAutomaticWithdrawalTime;
+            const autoWithdrawalCooldownExpired = timeSinceLastWithdrawal > AUTO_WITHDRAWAL_COOLDOWN_MS;
 
-            try {
-                // Update current user's balance, referral earnings, and total referrals
-                await updateUserData(userId, {
-                    balance: increment(parseFloat(referralAmount.toFixed(2))),
-                    referralEarnings: increment(parseFloat(referralAmount.toFixed(2))),
-                    totalReferrals: increment(1),
-                    referralCooldownEndTime: Date.now() + (1 * 60 * 60 * 1000) // 1 hour cooldown
-                });
-                showAlert("Referral Successful!", `You earned $${referralAmount.toFixed(2)} from a new referral!`, "success");
-            } catch (error) {
-                console.error("Error simulating referral:", error);
-                showAlert("Error", "Failed to simulate referral. Please try again.", "error");
+            if (balance >= MIN_WITHDRAWAL_AMOUNT && savedWithdrawalMethod && savedWithdrawalAddress && autoWithdrawalCooldownExpired) {
+                const amountToWithdraw = balance; // Withdraw the entire current balance
+
+                try {
+                    // Deduct balance to 0 and update last automatic withdrawal time
+                    await updateUserData(userId, {
+                        balance: 0,
+                        lastAutomaticWithdrawalTime: now
+                    });
+
+                    // Record the withdrawal request
+                    await addWithdrawalRequest(userId, {
+                        amount: parseFloat(amountToWithdraw.toFixed(2)),
+                        method: savedWithdrawalMethod,
+                        details: savedWithdrawalAddress,
+                        type: 'automatic' // Mark as automatic withdrawal
+                    });
+
+                    showAlert("Automatic Withdrawal!", `An automatic withdrawal of $${amountToWithdraw.toFixed(2)} via ${savedWithdrawalMethod} has been processed. Your balance is now $0.00.`, "success");
+                    // Update local state immediately for UI consistency
+                    balance = 0; // Directly update global variable, onSnapshot will sync later
+                    lastAutomaticWithdrawalTime = now;
+                    updateBalanceDisplay(); // Update UI
+                    updateCooldownDisplay(); // Update UI
+                } catch (error) {
+                    console.error("Error during automatic withdrawal:", error);
+                    showAlert("Auto Withdrawal Failed", "An error occurred during automatic withdrawal. Please contact support.", "error");
+                }
             }
         }
 
-
-        // Handle withdrawal submission
-        async function handleWithdrawalSubmit(event) {
+        // Handle saving withdrawal details (no longer an immediate withdrawal)
+        async function handleSaveWithdrawalDetails(event) {
             event.preventDefault();
             if (!userId) {
-                showAlert("Authentication Required", "Please log in to withdraw funds.", "error");
+                showAlert("Authentication Required", "Please log in to save withdrawal details.", "error");
                 return;
             }
 
             const form = event.target;
-            const amount = parseFloat(form.elements['withdrawal-amount'].value);
-            const method = form.elements['withdrawal-method-hidden'].value; // Use hidden input for method
-            const details = form.elements['withdrawal-details'].value;
-            const minWithdrawal = 500; // Minimum withdrawal amount
+            const method = form.elements['withdrawal-method-hidden'].value;
+            const address = form.elements['withdrawal-address'].value.trim();
 
-            if (isNaN(amount) || amount <= 0) {
-                showAlert("Invalid Amount", "Please enter a valid positive amount.", "error");
-                return;
-            }
-            if (amount < minWithdrawal) {
-                showAlert("Minimum Withdrawal", `Minimum withdrawal amount is $${minWithdrawal}.`, "warning");
-                return;
-            }
-            if (amount > balance) {
-                showAlert("Insufficient Balance", "Withdrawal amount exceeds your current balance.", "error");
+            if (!method || !address) {
+                showAlert("Missing Information", "Please select a method and enter your details.", "warning");
                 return;
             }
 
             try {
-                // Deduct balance first
-                await updateUserData(userId, { balance: increment(-parseFloat(amount.toFixed(2))) });
+                await updateUserData(userId, {
+                    withdrawalMethod: method,
+                    withdrawalAddress: address
+                });
+                // Update local state
+                savedWithdrawalMethod = method;
+                savedWithdrawalAddress = address;
 
-                // Add withdrawal request
-                await addWithdrawalRequest(userId, { amount, method, details });
-
-                document.getElementById('withdrawal-amount-display').textContent = amount.toFixed(2);
-                document.getElementById('withdrawal-method-display').textContent = method;
-                document.getElementById('withdrawal-confirmation-popup').classList.remove('hidden');
-
-                showAlert("Withdrawal Submitted!", `Your request for $${amount.toFixed(2)} via ${method} has been submitted.`, "success");
-
+                showAlert("Details Saved!", "Your withdrawal details have been saved. Funds will be automatically sent when your balance reaches $500.", "success");
+                renderPage('withdrawal'); // Re-render to show saved details
             } catch (error) {
-                console.error("Error submitting withdrawal:", error);
-                showAlert("Withdrawal Failed", error.message, "error");
-                // Potentially revert balance if deduction failed but request didn't go through
-                // (more complex error handling needed for production)
+                console.error("Error saving withdrawal details:", error);
+                showAlert("Save Failed", error.message, "error");
             }
         }
 
@@ -1219,6 +1369,14 @@
                 createAccount(email, password);
             });
             document.getElementById('guest-login-button').addEventListener('click', loginAsGuest);
+
+            // Show referral claim popup if activeReferralCode is present
+            if (activeReferralCode) {
+                document.getElementById('invited-by-code').textContent = activeReferralCode;
+                document.getElementById('referral-claim-popup').classList.remove('hidden');
+            } else {
+                document.getElementById('referral-claim-popup').classList.add('hidden');
+            }
         }
 
 
@@ -1358,7 +1516,7 @@
                                 />
                                 <div class="p-4">
                                     <h3 class="font-semibold text-lg text-gray-100 mb-2 font-heading">Ad Title ${index + 1}</h3>
-                                    <p class="text-gray-300 text-sm">Watch this ad for 10 seconds to earn <span class="font-bold text-green-400">$0.05 - $0.10</span>.</p>
+                                    <p class="text-gray-300 text-sm">Watch this ad for 10 seconds to earn <span class="font-bold text-green-400">$1.00 - $10.00</span>.</p>
                                     <button
                                         class="mt-4 w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-2 px-4 rounded-lg shadow-md border border-blue-500 watch-ad-button font-heading"
                                         ${adsWatched >= 30 || cooldownEndTime > Date.now() ? 'disabled' : ''}
@@ -1376,7 +1534,7 @@
             `;
             document.querySelectorAll('.ad-card').forEach(card => {
                 card.addEventListener('click', (e) => {
-                    const adIndex = parseInt(e.currentTarget.dataset.ad-index);
+                    const adIndex = parseInt(e.currentTarget.dataset.adIndex);
                     handleWatchAd(adIndex);
                 });
             });
@@ -1528,7 +1686,7 @@
 
         function renderReferralPage() {
             const mainContent = document.getElementById('main-content');
-            const referralTimeLeft = calculateTimeLeft(referralCooldownEndTime);
+            const referralLink = `${BASE_APP_URL}?ref=${referralCode}`; // Construct the full referral link
 
             mainContent.innerHTML = `
                 <div class="p-6 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 text-gray-100">
@@ -1536,14 +1694,20 @@
                     <p class="text-gray-300 mb-8 text-center">Invite your friends to join and earn <span class="font-bold text-green-400">$10.00</span> for each successful referral!</p>
 
                     <div class="bg-gray-900 p-6 rounded-xl shadow-md mb-8 border border-gray-700 text-center">
-                        <p class="text-lg text-gray-300 font-heading mb-2">Your Referral Code:</p>
-                        <div class="flex items-center justify-center space-x-3 mb-4">
-                            <span id="referral-code-display" class="text-2xl font-bold text-yellow-400 bg-gray-700 px-4 py-2 rounded-lg select-all font-mono">${referralCode}</span>
-                            <button id="copy-referral-code" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center gap-2">
-                                <i class="fas fa-copy"></i> Copy
+                        <p class="text-lg text-gray-300 font-heading mb-2">Your Unique Referral Link:</p>
+                        <div class="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-3 mb-4">
+                            <input
+                                type="text"
+                                id="referral-link-display"
+                                class="flex-grow shadow appearance-none border border-gray-600 bg-gray-700 rounded-lg py-2 px-4 text-gray-100 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 text-center sm:text-left"
+                                value="${referralLink}"
+                                readonly
+                            />
+                            <button id="copy-referral-link" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center justify-center gap-2 w-full sm:w-auto">
+                                <i class="fas fa-copy"></i> Copy Link
                             </button>
                         </div>
-                        <p class="text-gray-400 text-sm">Share this code with your friends!</p>
+                        <p class="text-gray-400 text-sm">Share this link with your friends to invite them!</p>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -1557,17 +1721,9 @@
                         </div>
                     </div>
 
-                    <div class="bg-gray-900 p-6 rounded-xl shadow-md border border-gray-700 text-center">
-                        <h3 class="text-2xl font-semibold text-gray-200 mb-4 font-heading">Simulate a Referral</h3>
-                        <p class="text-gray-300 mb-4">Click the button below to simulate a friend joining using your code and instantly earn $10!</p>
-                        <button id="simulate-referral-button" class="bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-indigo-700 hover:to-purple-800 text-white font-bold py-3 px-6 rounded-xl shadow-md transform hover:scale-105 transition duration-300 flex items-center justify-center space-x-2 mx-auto border border-purple-500 font-heading" ${referralTimeLeft.isActive ? 'disabled' : ''}>
-                            <i class="fas fa-user-plus"></i>
-                            <span>Simulate Friend Referral</span>
-                        </button>
-                        <p id="referral-cooldown-message" class="text-red-400 mt-4 text-center font-medium font-heading ${referralTimeLeft.isActive ? '' : 'hidden'}">
-                            Next simulation available in: <span id="referral-cooldown-hours">0</span>h <span id="referral-cooldown-minutes">0</span>m <span id="referral-cooldown-seconds">0</span>s
-                        </p>
-                    </div>
+                    <p id="referral-cooldown-message" class="text-red-400 mt-4 text-center font-medium font-heading hidden">
+                        Referral rewards cooldown active. Next reward possible in: <span id="referral-cooldown-hours">0</span>h <span id="referral-cooldown-minutes">0</span>m <span id="referral-cooldown-seconds">0</span>s
+                    </p>
 
                     <button id="referral-back-button" class="mt-8 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-3 px-6 rounded-xl shadow-md transform hover:scale-105 transition duration-300 block mx-auto border border-gray-500 font-heading">
                         Back to Dashboard
@@ -1575,24 +1731,22 @@
                 </div>
             `;
 
-            document.getElementById('copy-referral-code').addEventListener('click', () => {
-                const codeToCopy = document.getElementById('referral-code-display').textContent;
-                // Use execCommand for broader compatibility in iframes
+            document.getElementById('copy-referral-link').addEventListener('click', () => {
+                const linkToCopy = document.getElementById('referral-link-display').value;
                 const textarea = document.createElement('textarea');
-                textarea.value = codeToCopy;
+                textarea.value = linkToCopy;
                 document.body.appendChild(textarea);
                 textarea.select();
                 try {
                     document.execCommand('copy');
-                    showAlert("Copied!", "Referral code copied to clipboard.", "success");
+                    showAlert("Copied!", "Referral link copied to clipboard.", "success");
                 } catch (err) {
                     console.error('Failed to copy text: ', err);
-                    showAlert("Error", "Failed to copy code. Please copy manually.", "error");
+                    showAlert("Error", "Failed to copy link. Please copy manually.", "error");
                 }
                 document.body.removeChild(textarea);
             });
 
-            document.getElementById('simulate-referral-button').addEventListener('click', handleSimulateReferral);
             document.getElementById('referral-back-button').addEventListener('click', () => renderPage('dashboard'));
             updateCooldownDisplay(); // Update referral cooldown on page load
         }
@@ -1600,32 +1754,45 @@
 
         function renderWithdrawalPage() {
             const mainContent = document.getElementById('main-content');
+            const autoWithdrawalTimeLeft = calculateTimeLeft(lastAutomaticWithdrawalTime + AUTO_WITHDRAWAL_COOLDOWN_MS);
+
             mainContent.innerHTML = `
                 <div class="p-6 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 text-gray-100">
                     <h2 class="text-3xl font-extrabold text-gray-100 mb-6 text-center font-heading">Withdraw Your Earnings</h2>
                     <p class="text-gray-300 mb-6 text-center">Current Balance: <span class="font-bold text-blue-400" id="withdrawal-current-balance">${getFormattedBalance()}</span></p>
-                    <p class="text-gray-300 mb-6 text-center text-sm">Minimum withdrawal amount: <span class="font-bold text-green-400">$500.00</span></p>
+                    <p class="text-gray-300 mb-6 text-center text-sm">
+                        Minimum balance for automatic withdrawal: <span class="font-bold text-green-400">$${MIN_WITHDRAWAL_AMOUNT.toFixed(2)}</span>
+                    </p>
 
+                    ${savedWithdrawalMethod && savedWithdrawalAddress ? `
+                        <div class="bg-gray-900 p-6 rounded-xl shadow-md mb-8 border border-blue-600 text-center">
+                            <h3 class="text-xl font-semibold text-blue-400 mb-3 font-heading">Your Saved Withdrawal Details:</h3>
+                            <p class="text-lg text-gray-200 mb-2">Method: <span class="font-bold text-yellow-300">${savedWithdrawalMethod.toUpperCase()}</span></p>
+                            <p class="text-md text-gray-300 break-words">Address/Details: <span class="font-mono text-green-300">${savedWithdrawalAddress}</span></p>
+                            <p class="text-green-400 font-medium mt-4">
+                                Funds will be automatically sent when your balance reaches $${MIN_WITHDRAWAL_AMOUNT.toFixed(2)}.
+                            </p>
+                            ${autoWithdrawalTimeLeft.isActive ? `
+                                <p id="auto-withdrawal-cooldown-message" class="text-red-400 mt-2 text-center font-medium font-heading">
+                                    Next automatic withdrawal possible in: <span id="auto-withdrawal-cooldown-hours">0</span>h <span id="auto-withdrawal-cooldown-minutes">0</span>m <span id="auto-withdrawal-cooldown-seconds">0</span>s
+                                </p>
+                            ` : `
+                                <p id="auto-withdrawal-cooldown-message" class="text-green-400 mt-2 text-center font-medium font-heading hidden">
+                                    Ready for automatic withdrawal!
+                                </p>
+                            `}
+                        </div>
+                    ` : `
+                        <div class="bg-gray-900 p-6 rounded-xl shadow-md mb-8 border border-yellow-600 text-center">
+                            <p class="text-lg text-yellow-300 font-heading">No withdrawal details saved yet.</p>
+                            <p class="text-gray-300 mt-2">Please save your details below to enable automatic withdrawals.</p>
+                        </div>
+                    `}
 
                     <form id="withdrawal-form" class="bg-gray-900 p-6 rounded-xl shadow-md border border-gray-700 text-gray-100">
                         <div class="mb-6">
-                            <label for="withdrawal-amount" class="block text-gray-200 text-sm font-bold mb-2 font-heading">
-                                Amount to Withdraw ($):
-                            </label>
-                            <input
-                                type="number"
-                                id="withdrawal-amount"
-                                class="shadow appearance-none border border-gray-600 bg-gray-800 rounded-lg w-full py-3 px-4 text-gray-100 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="e.g., 500.00"
-                                min="0.01"
-                                step="0.01"
-                                required
-                            />
-                        </div>
-
-                        <div class="mb-6">
                             <label class="block text-gray-200 text-sm font-bold mb-2 font-heading">
-                                Withdrawal Method:
+                                Select Withdrawal Method:
                             </label>
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <button type="button" class="p-4 rounded-xl shadow-lg flex flex-col items-center justify-center transition duration-300 border withdrawal-method-button" data-method="paypal">
@@ -1641,27 +1808,27 @@
                                     <span class="font-semibold font-heading">Bank Transfer</span>
                                 </button>
                             </div>
-                            <input type="hidden" id="withdrawal-method-hidden" value="paypal"> <!-- Hidden input to store selected method -->
+                            <input type="hidden" id="withdrawal-method-hidden" value="${savedWithdrawalMethod || 'paypal'}"> <!-- Hidden input to store selected method -->
                         </div>
 
                         <div class="mb-6">
-                            <label for="withdrawal-details" class="block text-gray-200 text-sm font-bold mb-2 font-heading">
-                                PayPal Email:
+                            <label for="withdrawal-address" class="block text-gray-200 text-sm font-bold mb-2 font-heading">
+                                ${savedWithdrawalMethod === 'paypal' ? 'PayPal Email:' : savedWithdrawalMethod === 'crypto' ? 'Crypto Wallet Address (e.g., BTC, ETH, XRP, USDT):' : savedWithdrawalMethod === 'bank' ? 'Bank Account Details (Bank Name, Account No., Swift Code):' : 'Enter your withdrawal details:'}
                             </label>
                             <textarea
-                                id="withdrawal-details"
+                                id="withdrawal-address"
                                 class="shadow appearance-none border border-gray-600 bg-gray-800 rounded-lg w-full py-3 px-4 text-gray-100 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none"
-                                placeholder="your-email@example.com"
+                                placeholder="${savedWithdrawalMethod === 'paypal' ? 'your-email@example.com' : savedWithdrawalMethod === 'crypto' ? '0xAbc...123 (ETH), 1A1zP... (BTC), etc.' : savedWithdrawalMethod === 'bank' ? 'Bank Name: ABC Bank\nAccount Number: 123456789\nSwift Code: ABCDEFGH' : 'Enter your PayPal email, crypto address, or bank details'}"
                                 required
-                            ></textarea>
+                            >${savedWithdrawalAddress || ''}</textarea>
                         </div>
 
                         <button
                             type="submit"
                             class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-4 rounded-lg shadow-md transform hover:scale-105 transition duration-300 flex items-center justify-center space-x-2 border border-blue-500 font-heading"
                         >
-                            <i class="fas fa-paper-plane"></i>
-                            <span>Submit Withdrawal Request</span>
+                            <i class="fas fa-save"></i>
+                            <span>Save Withdrawal Details</span>
                         </button>
                     </form>
 
@@ -1674,13 +1841,13 @@
             // Event listeners for withdrawal form
             const withdrawalForm = document.getElementById('withdrawal-form');
             if (withdrawalForm) {
-                withdrawalForm.addEventListener('submit', handleWithdrawalSubmit);
+                withdrawalForm.addEventListener('submit', handleSaveWithdrawalDetails);
             }
 
             const withdrawalMethodButtons = document.querySelectorAll('.withdrawal-method-button');
             const withdrawalMethodHidden = document.getElementById('withdrawal-method-hidden');
-            const withdrawalDetailsLabel = withdrawalForm.querySelector('label[for="withdrawal-details"]');
-            const withdrawalDetailsTextarea = document.getElementById('withdrawal-details');
+            const withdrawalAddressLabel = withdrawalForm.querySelector('label[for="withdrawal-address"]');
+            const withdrawalAddressTextarea = document.getElementById('withdrawal-address');
 
             function updateMethodSelection(selectedMethod) {
                 withdrawalMethodButtons.forEach(button => {
@@ -1712,14 +1879,14 @@
 
                 // Update label and placeholder for details textarea
                 if (selectedMethod === 'paypal') {
-                    withdrawalDetailsLabel.textContent = 'PayPal Email:';
-                    withdrawalDetailsTextarea.placeholder = 'your-email@example.com';
+                    withdrawalAddressLabel.textContent = 'PayPal Email:';
+                    withdrawalAddressTextarea.placeholder = 'your-email@example.com';
                 } else if (selectedMethod === 'crypto') {
-                    withdrawalDetailsLabel.textContent = 'Crypto Wallet Address (e.g., BTC, ETH, XRP, USDT):';
-                    withdrawalDetailsTextarea.placeholder = '0xAbc...123 (ETH), 1A1zP... (BTC), etc.';
+                    withdrawalAddressLabel.textContent = 'Crypto Wallet Address (e.g., BTC, ETH, XRP, USDT):';
+                    withdrawalAddressTextarea.placeholder = '0xAbc...123 (ETH), 1A1zP... (BTC), etc.';
                 } else if (selectedMethod === 'bank') {
-                    withdrawalDetailsLabel.textContent = 'Bank Account Details (Bank Name, Account No., Swift Code):';
-                    withdrawalDetailsTextarea.placeholder = 'Bank Name: ABC Bank\nAccount Number: 123456789\nSwift Code: ABCDEFGH';
+                    withdrawalAddressLabel.textContent = 'Bank Account Details (Bank Name, Account No., Swift Code):';
+                    withdrawalAddressTextarea.placeholder = 'Bank Name: ABC Bank\nAccount Number: 123456789\nSwift Code: ABCDEFGH';
                 }
             }
 
@@ -1727,11 +1894,12 @@
                 button.addEventListener('click', () => updateMethodSelection(button.dataset.method));
             });
 
-            // Set initial selection
-            updateMethodSelection(withdrawalMethodHidden.value);
+            // Set initial selection based on saved data or default
+            updateMethodSelection(savedWithdrawalMethod || 'paypal');
 
             document.getElementById('withdrawal-back-button').addEventListener('click', () => renderPage('dashboard'));
-            document.getElementById('withdrawal-current-balance').textContent = getFormattedBalance();
+            updateBalanceDisplay(); // Update current balance display
+            updateCooldownDisplay(); // Update auto withdrawal cooldown display
         }
 
         function renderPrivacyPage() {
@@ -1878,6 +2046,11 @@
             requestAnimationFrame(animateParticles);
         }
 
+        // Function to parse URL for referral code
+        function getReferralCodeFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('ref');
+        }
 
         // --- Initialize App ---
         document.addEventListener('DOMContentLoaded', async () => {
@@ -1898,6 +2071,9 @@
 
             initCanvas(); // Initialize background canvas animation
             
+            // Check for referral code in URL immediately on load
+            activeReferralCode = getReferralCodeFromUrl();
+
             // Set up Auth state listener
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
@@ -1916,13 +2092,19 @@
                             referralCode = data.referralCode || '';
                             totalReferrals = data.totalReferrals || 0;
                             referralEarnings = data.referralEarnings || 0;
-                            referralCooldownEndTime = data.referralCooldownEndTime || 0;
+                            savedWithdrawalMethod = data.withdrawalMethod || null; // Load saved method
+                            savedWithdrawalAddress = data.withdrawalAddress || null; // Load saved address
+                            lastAutomaticWithdrawalTime = data.lastAutomaticWithdrawalTime || 0; // Load last auto withdrawal time
+                            
                             isAuthReady = true; // Data loaded
-                            renderPage('dashboard');
+                            renderPage('dashboard'); // Render dashboard after data is loaded
+                            checkAndProcessAutomaticWithdrawal(); // Check for auto withdrawal
                         } else {
                             // User exists but no profile data (e.g., new anonymous user or new email/password user)
-                            // Create a default profile
-                            const newReferralCode = generateUniqueId();
+                            // This case is handled in createAccount/loginAsGuest now, so it should create a profile.
+                            // If it still happens here, it means something went wrong with initial profile creation.
+                            console.warn("User profile not found for existing user:", userId, "Attempting to create default profile.");
+                            const newReferralCode = generateReferralCode(userId);
                             createOrUpdateUserProfile(userId, {
                                 balance: 0,
                                 adsWatched: 0,
@@ -1933,16 +2115,19 @@
                                 referralCode: newReferralCode,
                                 totalReferrals: 0,
                                 referralEarnings: 0,
-                                referralCooldownEndTime: 0,
+                                referredBy: null,
+                                withdrawalMethod: null, // Initialize
+                                withdrawalAddress: null, // Initialize
+                                lastAutomaticWithdrawalTime: 0, // Initialize
                                 createdAt: Date.now()
                             }).then(() => {
                                 isAuthReady = true;
                                 renderPage('dashboard');
                             }).catch(error => {
-                                console.error("Error creating default profile:", error);
+                                console.error("Error creating default profile for existing user:", error);
                                 showAlert("Error", "Failed to initialize user profile.", "error");
-                                isAuthReady = true; // Still mark as ready to avoid infinite loop
-                                renderPage('auth'); // Fallback to auth if profile creation fails
+                                isAuthReady = true;
+                                renderPage('auth');
                             });
                         }
                     }, (error) => {
@@ -1959,41 +2144,42 @@
                 }
             });
 
-            // Initial sign-in logic for external deployment
-            // If running outside Canvas, we don't have __initial_auth_token.
-            // We'll try to sign in anonymously if no user is already authenticated.
-            // The onAuthStateChanged listener will then handle rendering the correct page.
-            if (!auth.currentUser) { // Check if a user is already authenticated (e.g., from a previous session)
-                try {
-                    await signInAnonymously(auth);
-                } catch (error) {
-                    console.error("Error during initial anonymous sign-in:", error);
-                    // If anonymous sign-in fails, the onAuthStateChanged will still fire with null user,
-                    // leading to renderAuthPage().
-                }
-            }
-
-
             // Setup navigation button listeners (these are static elements)
             document.getElementById('nav-dashboard').addEventListener('click', () => renderPage('dashboard'));
             document.getElementById('nav-watch-ads').addEventListener('click', () => renderPage('watch-ads'));
             document.getElementById('nav-spin-roll').addEventListener('click', () => renderPage('spin-roll'));
-            document.getElementById('nav-tasks').addEventListener('click', () => renderPage('tasks')); // New: Tasks nav button
-            document.getElementById('nav-referral').addEventListener('click', () => renderPage('referral')); // New: Referral nav button
+            document.getElementById('nav-tasks').addEventListener('click', () => renderPage('tasks'));
+            document.getElementById('nav-referral').addEventListener('click', () => renderPage('referral'));
             document.getElementById('nav-withdrawal').addEventListener('click', () => renderPage('withdrawal'));
             document.getElementById('nav-privacy').addEventListener('click', () => renderPage('privacy'));
-            document.getElementById('nav-logout').addEventListener('click', logoutUser); // Logout button
+            document.getElementById('nav-logout').addEventListener('click', logoutUser);
 
             // Setup popup close buttons (these are static elements)
             document.getElementById('close-ad-completion-popup').addEventListener('click', () => {
                 document.getElementById('ad-completion-popup').classList.add('hidden');
             });
-            document.getElementById('close-task-completion-popup').addEventListener('click', () => { // New: Task completion popup close
+            document.getElementById('close-task-completion-popup').addEventListener('click', () => {
                 document.getElementById('task-completion-popup').classList.add('hidden');
             });
             document.getElementById('close-withdrawal-popup').addEventListener('click', () => {
                 document.getElementById('withdrawal-confirmation-popup').classList.add('hidden');
             });
+
+            // Referral Claim Popup Buttons
+            document.getElementById('claim-invitation-button').addEventListener('click', () => {
+                // This button is clicked when a user is already on the auth page,
+                // and has just seen the referral popup.
+                // The actual claiming happens when they create an account or log in as guest.
+                // For now, just close the popup and let them proceed with auth.
+                document.getElementById('referral-claim-popup').classList.add('hidden');
+                showAlert("Ready to Claim", "Please create an account or log in to claim your bonus!", "info");
+            });
+            document.getElementById('close-referral-claim-popup').addEventListener('click', () => {
+                activeReferralCode = null; // Discard the referral if user closes popup
+                window.history.replaceState({}, document.title, window.location.pathname); // Clean URL
+                document.getElementById('referral-claim-popup').classList.add('hidden');
+            });
+
 
             // Start notification generators
             setInterval(() => {
@@ -2012,12 +2198,10 @@
 
             // Update cooldown display every second if cooldown is active
             setInterval(() => {
-                if (isAuthReady && (cooldownEndTime > Date.now() || spinCooldownEndTime > Date.now() || taskCooldownEndTime > Date.now() || referralCooldownEndTime > Date.now())) {
+                if (isAuthReady && (cooldownEndTime > Date.now() || spinCooldownEndTime > Date.now() || taskCooldownEndTime > Date.now() || referralCooldownEndTime > Date.now() || (lastAutomaticWithdrawalTime + AUTO_WITHDRAWAL_COOLDOWN_MS > Date.now()))) {
                     updateCooldownDisplay();
                 }
             }, 1000);
-
-            // Initial render will be handled by onAuthStateChanged
         });
     </script>
 </body>
