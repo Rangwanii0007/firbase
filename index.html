@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Three.js for 3D Coin Rain -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         /* Custom Keyframes for Animations */
         @keyframes fade-in-out-right {
@@ -32,6 +34,12 @@
           100% { background-position: 0% 50%; }
         }
 
+        @keyframes segment-highlight {
+            0% { box-shadow: 0 0 0px rgba(255,255,255,0); }
+            50% { box-shadow: 0 0 20px rgba(255,255,255,0.8), 0 0 40px rgba(255,255,255,0.5); }
+            100% { box-shadow: 0 0 0px rgba(255,255,255,0); }
+        }
+
         .animate-fade-in-out-right {
           animation: fade-in-out-right 5s ease-in-out forwards;
         }
@@ -44,6 +52,10 @@
           background: linear-gradient(-45deg, #1f2937, #374151, #111827, #4b5563);
           background-size: 400% 400%;
           animation: bg-pulse 15s ease infinite;
+        }
+
+        .animate-segment-highlight {
+            animation: segment-highlight 1.5s ease-out forwards;
         }
 
         /* Ensure full height and proper font application */
@@ -381,11 +393,25 @@
             background-color: #d97706;
         }
 
+        /* Coin Rain Canvas */
+        #coin-rain-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50; /* Higher than app-container (z-index: 1) */
+            pointer-events: none; /* Allows clicks to pass through */
+            background: transparent;
+        }
+
     </style>
 </head>
 <body>
     <!-- Live Background Canvas -->
     <canvas id="background-canvas"></canvas>
+    <!-- Coin Rain Canvas (for 3D effects) -->
+    <canvas id="coin-rain-canvas" class="fixed inset-0 z-50 pointer-events-none hidden"></canvas>
 
     <div id="app-container" class="bg-gradient-to-br from-gray-950 to-gray-800">
         <!-- Animated Background Overlay (kept for pulsating effect) -->
@@ -450,6 +476,7 @@
 
         <!-- Main Content Area -->
         <main id="main-content" class="w-full max-w-4xl px-4 z-10">
+            <div id="loading-message" class="text-center text-blue-400 text-xl font-semibold mt-10">Loading application...</div>
             <!-- Page content will be rendered here by JavaScript -->
         </main>
 
@@ -541,7 +568,7 @@
     <script type="module">
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, onSnapshot, increment, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global Firebase instances
@@ -553,6 +580,7 @@
 
         // Global state variables (now backed by Firestore)
         let balance = 0;
+        let displayedBalance = 0; // For smooth counting animation
         let adsWatched = 0;
         let cooldownEndTime = 0; // For ad watching
         let spinCooldownEndTime = 0; // For spin wheel
@@ -560,7 +588,8 @@
         let taskCooldownEndTime = 0; // New: Cooldown for tasks
         let referralCode = ''; // User's unique referral code
         let totalReferrals = 0; // Count of successful referrals
-        let referralEarnings = 0; // Total earnings from referrals
+        let referralEarnings = 0; // Total earnings from referrals (claimed)
+        let unclaimedReferralBalance = 0; // New: Earnings from referrals not yet claimed
         let referralCooldownEndTime = 0; // Cooldown for simulating referrals (now for referrer reward)
 
         // New withdrawal state
@@ -578,6 +607,11 @@
 
         // IMPORTANT: Replace with your actual GitHub Pages URL or custom domain URL
         const BASE_APP_URL = "https://your-username.github.io/your-repo-name/"; // Example: "https://myusername.github.io/my-ad-app/"
+        // IMPORTANT: Replace with the URL of your deployed Firebase Cloud Function for referral processing
+        // Example: "https://us-central1-your-project-id.cloudfunctions.net/processReferral"
+        // YOU MUST DEPLOY A CLOUD FUNCTION FOR THE REFERRAL PROGRAM TO WORK SECURELY.
+        const FIREBASE_CLOUD_FUNCTION_REFERRAL_URL = "YOUR_FIREBASE_CLOUD_FUNCTION_URL/processReferral";
+
 
         // Ad links (used for both Watch Ads and Tasks)
         const adLinks = [
@@ -668,7 +702,8 @@
         };
 
         // --- Firebase Data Operations ---
-        const appId = "adwatchrewardsapp"; // Your Firebase Project ID
+        // Use global __app_id if available, otherwise fallback to a default
+        const appId = typeof __app_id !== 'undefined' ? __app_id : "adwatchrewardsapp";
 
         async function getUserProfile(uid) {
             const userDocRef = doc(db, `artifacts/${appId}/users/${uid}/profile/data`);
@@ -728,8 +763,9 @@
                     taskCooldownEndTime: 0,
                     referralCode: newReferralCode,
                     totalReferrals: 0,
-                    referralEarnings: 0,
-                    referredBy: null, // New field to track if this user was referred
+                    referralEarnings: 0, // Claimed earnings
+                    unclaimedReferralBalance: 0, // New: Unclaimed earnings
+                    referredBy: null, // New field to track if this user was referred (set by Cloud Function)
                     withdrawalMethod: null, // New: Default withdrawal method
                     withdrawalAddress: null, // New: Default withdrawal address
                     lastAutomaticWithdrawalTime: 0, // New: Timestamp of last automatic withdrawal
@@ -772,7 +808,8 @@
                         referralCode: newReferralCode,
                         totalReferrals: 0,
                         referralEarnings: 0,
-                        referredBy: null, // New field
+                        unclaimedReferralBalance: 0, // New: Unclaimed earnings
+                        referredBy: null, // New field (set by Cloud Function)
                         withdrawalMethod: null, // New: Default withdrawal method
                         withdrawalAddress: null, // New: Default withdrawal address
                         lastAutomaticWithdrawalTime: 0, // New: Timestamp of last automatic withdrawal
@@ -808,14 +845,16 @@
                 showAlert("Logged Out", "You have been logged out.", "info");
                 // Reset state and render auth page
                 balance = 0;
+                displayedBalance = 0; // Reset displayed balance too
                 adsWatched = 0;
                 cooldownEndTime = 0;
                 spinCooldownEndTime = 0;
                 tasksCompleted = 0;
                 taskCooldownEndTime = 0;
-            referralCode = '';
+                referralCode = '';
                 totalReferrals = 0;
                 referralEarnings = 0;
+                unclaimedReferralBalance = 0; // Reset unclaimed balance
                 savedWithdrawalMethod = null;
                 savedWithdrawalAddress = null;
                 lastAutomaticWithdrawalTime = 0;
@@ -845,21 +884,10 @@
             return `REF-${uid.substring(0, 8)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
         }
 
-        // Function to extract UID from a referral code
-        function getUidFromReferralCode(refCode) {
-            const parts = refCode.split('-');
-            if (parts.length === 3 && parts[0] === 'REF') {
-                // Reconstruct a potential UID prefix. This is NOT the full UID, just a hint.
-                // We'll verify against the actual user profile.
-                return parts[1];
-            }
-            return null;
-        }
-
-        // Function to claim referral bonus
+        // Function to claim referral bonus (for the NEW user, and trigger Cloud Function for referrer's unclaimed balance)
         async function claimReferralBonus(referrerCode, newUserId) {
             const referralBonusAmount = 5.00; // Bonus for the new user
-            const referrerRewardAmount = 10.00; // Reward for the referrer
+            const referrerRewardAmount = 30.00; // Reward for the referrer (added to unclaimed by Cloud Function)
 
             try {
                 const newUserProfile = await getUserProfile(newUserId);
@@ -872,57 +900,80 @@
                     return; // Already referred, prevent re-claiming
                 }
 
-                // Get referrer's UID from the code (first 8 chars of UID in the code)
-                const potentialReferrerUidPrefix = getUidFromReferralCode(referrerCode);
-                if (!potentialReferrerUidPrefix) {
-                    showAlert("Invalid Referral", "The referral code is invalid.", "error");
-                    return;
-                }
-
-                // Attempt to find the actual referrer's profile by querying all profiles for the referralCode
-                // This is a simplified approach. In a large app, you'd use a Firestore index for `referralCode`.
-                // For this example, we'll iterate (less efficient but avoids index setup for now).
-                let referrerUid = null;
-                let referrerProfile = null;
-
-                // Querying all user profiles to find the referrer by their referralCode
-                // Note: For a large number of users, this approach can be inefficient.
-                // A Firestore query with `where("referralCode", "==", referrerCode)` would be better
-                // but requires a composite index. For this demo, iterating is acceptable.
-                const usersCollectionRef = collection(db, `artifacts/${appId}/users`);
-                const userDocsSnap = await getDocs(usersCollectionRef);
-                for (const userDoc of userDocsSnap.docs) {
-                    const profileDataRef = doc(db, `artifacts/${appId}/users/${userDoc.id}/profile/data`);
-                    const profileSnap = await getDoc(profileDataRef);
-                    if (profileSnap.exists() && profileSnap.data().referralCode === referrerCode) {
-                        referrerUid = userDoc.id;
-                        referrerProfile = profileSnap.data();
-                        break; // Found the referrer, exit loop
-                    }
-                }
-
-                if (!referrerUid || referrerUid === newUserId) {
-                    showAlert("Invalid Referral", "The referral code is invalid or you cannot refer yourself.", "error");
-                    return;
-                }
-
-                // 1. Reward the new user
+                // 1. Reward the new user (referred user) immediately on client-side (safe as it's their own balance)
                 await updateUserData(newUserId, {
                     balance: increment(parseFloat(referralBonusAmount.toFixed(2))),
-                    referredBy: referrerCode // Mark this user as referred
+                    // Note: 'referredBy' is now set by the Cloud Function for consistency,
+                    // but could also be set here if you prefer.
                 });
                 showAlert("Bonus Claimed!", `You received a $${referralBonusAmount.toFixed(2)} welcome bonus!`, "success");
+                triggerCoinRain(referralBonusAmount, selectedCurrency); // Trigger coin rain for the new user's bonus
 
-                // 2. Reward the referrer
-                await updateUserData(referrerUid, {
-                    totalReferrals: increment(1),
-                    referralEarnings: increment(parseFloat(referrerRewardAmount.toFixed(2)))
-                });
-                showAlert("Referral Success", `Your friend claimed their bonus! You earned $${referrerRewardAmount.toFixed(2)}.`, "success");
+                // 2. Trigger Cloud Function to securely reward the referrer
+                // This is crucial for security as direct client-side updates to other users' profiles are blocked by Firestore rules.
+                try {
+                    // Ensure the user is authenticated before trying to get a token
+                    if (!auth.currentUser) {
+                        throw new Error("User not authenticated to call Cloud Function.");
+                    }
+                    const idToken = await auth.currentUser.getIdToken();
+
+                    const response = await fetch(FIREBASE_CLOUD_FUNCTION_REFERRAL_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${idToken}` // Send auth token for verification in Cloud Function
+                        },
+                        body: JSON.stringify({ referrerCode, newUserId, referrerRewardAmount })
+                    });
+
+                    const result = await response.json();
+                    if (response.ok) {
+                        // Cloud Function successfully processed the referrer reward
+                        console.log("Cloud Function success:", result.message);
+                        // The referrer's balance will be updated by the Cloud Function
+                        // and then synced via onSnapshot. No client-side update for referrer here.
+                    } else {
+                        console.error("Cloud Function error:", result.error);
+                        showAlert("Referral Error", `Could not process referrer reward: ${result.error || 'Unknown error'}`, "error");
+                    }
+                } catch (cfError) {
+                    console.error("Error calling Cloud Function:", cfError);
+                    showAlert("Referral Error", "Failed to communicate with referral server. Please ensure the Cloud Function is deployed and FIREBASE_CLOUD_FUNCTION_REFERRAL_URL is correct.", "error");
+                }
 
             } catch (error) {
-                console.error("Error claiming referral bonus:", error);
+                console.error("Error claiming referral bonus (client-side):", error);
                 showAlert("Referral Failed", "Could not claim referral bonus. Please try again.", "error");
+            }
+        }
+
+        // New: Function to claim unclaimed referral earnings (by the referrer)
+        async function handleClaimReferralEarnings() {
+            if (!userId) {
+                showAlert("Authentication Required", "Please log in to claim earnings.", "error");
+                return;
+            }
+            if (unclaimedReferralBalance <= 0) {
+                showAlert("No Earnings", "You have no unclaimed referral earnings to claim.", "info");
+                return;
+            }
+
+            const amountToClaim = unclaimedReferralBalance;
+
+            try {
+                // This update is safe client-side because the user is claiming their *own* balance.
+                await updateUserData(userId, {
+                    balance: increment(parseFloat(amountToClaim.toFixed(2))),
+                    referralEarnings: increment(parseFloat(amountToClaim.toFixed(2))), // Add to total claimed earnings
+                    unclaimedReferralBalance: 0 // Reset unclaimed balance
+                });
+                showAlert("Earnings Claimed!", `Successfully claimed $${amountToClaim.toFixed(2)} from your referral balance!`, "success");
+                triggerCoinRain(amountToClaim, selectedCurrency); // Trigger coin rain on successful earning
+                renderPage('referral'); // Re-render page to update display
+            } catch (error) {
+                console.error("Error claiming referral earnings:", error);
+                showAlert("Claim Failed", "Could not claim referral earnings. Please try again.", "error");
             }
         }
 
@@ -1180,6 +1231,7 @@
                         balance: increment(parseFloat(earnAmount.toFixed(2))),
                         adsWatched: increment(1)
                     });
+                    triggerCoinRain(earnAmount, selectedCurrency); // Trigger coin rain on successful earning
 
                     if (adsWatched + 1 >= 30) { // Check against updated adsWatched
                         const fiveHoursLater = Date.now() + (5 * 60 * 60 * 1000); // 5 hours in milliseconds
@@ -1195,14 +1247,13 @@
 
         // Define segments for the spin wheel
         const spinSegments = [
-            { value: 5, display: "$5", color: "#FF6347" },
-            { value: 7, display: "$7", color: "#4CAF50" },
-            { value: 10, display: "$10", color: "#2196F3" },
-            { value: 12, display: "$12", color: "#9C27B0" },
-            { value: 15, display: "$15", color: "#FF9800" },
-            { value: 20, display: "$20", color: "#673AB7" },
-            { value: 25, display: "$25", color: "#00BCD4" },
-            { value: 30, display: "$30", color: "#FFEB3B" }
+            { value: 0.50, display: "$0.50", color: "#FF6347" }, // Red-Orange
+            { value: 1.00, display: "$1.00", color: "#4CAF50" }, // Green
+            { value: 2.50, display: "$2.50", color: "#2196F3" }, // Blue
+            { value: 5.00, display: "$5.00", color: "#9C27B0" }, // Purple
+            { value: 10.00, display: "$10.00", color: "#FF9800" }, // Orange
+            { value: 15.00, display: "$15.00", color: "#673AB7" }, // Deep Purple
+            { value: 20.00, display: "$20.00", color: "#00BCD4" }  // Cyan
         ];
 
         // Handle spinning the wheel
@@ -1240,14 +1291,27 @@
             spinWheel.style.transition = 'transform 4s cubic-bezier(0.25, 0.1, 0.25, 1)'; // Apply new transition
             spinWheel.style.transform = `rotate(${finalRotation}deg)`;
             
+            // Highlight the selected segment after the spin animation completes
             setTimeout(async () => {
+                // Remove any existing highlights
+                document.querySelectorAll('.spin-wheel-segment-path').forEach(path => {
+                    path.classList.remove('animate-segment-highlight');
+                });
+
+                // Add highlight to the winning segment
+                const winningSegmentPath = document.getElementById(`segment-path-${randomIndex}`);
+                if (winningSegmentPath) {
+                    winningSegmentPath.classList.add('animate-segment-highlight');
+                }
+
                 try {
-                    const fiveHoursLater = Date.now() + (5 * 60 * 60 * 1000); // 5 hours in milliseconds
+                    const tenHoursLater = Date.now() + (10 * 60 * 60 * 1000); // 10 hours in milliseconds
                     await updateUserData(userId, {
                         balance: increment(parseFloat(earnAmount.toFixed(2))),
-                        spinCooldownEndTime: fiveHoursLater
+                        spinCooldownEndTime: tenHoursLater
                     });
-                    showAlert("Congratulations!", `You won $${earnAmount.toFixed(2)} from the spin wheel!`, "success");
+                    showAlert("Congratulations!", `🎉 You won $${earnAmount.toFixed(2)}! It has been added to your balance.`, "success");
+                    triggerCoinRain(earnAmount, selectedCurrency); // Trigger coin rain on successful earning
                 } catch (error) {
                     console.error("Error updating spin data:", error);
                     showAlert("Error", "Failed to record spin. Please try again.", "error");
@@ -1296,6 +1360,7 @@
                         balance: increment(parseFloat(earnAmount.toFixed(2))),
                         tasksCompleted: increment(1)
                     });
+                    triggerCoinRain(earnAmount, selectedCurrency); // Trigger coin rain on successful earning
 
                     if (tasksCompleted + 1 >= tasks.length) { // Check against updated tasksCompleted
                         const fiveHoursLater = Date.now() + (5 * 60 * 60 * 1000); // 5 hours in milliseconds
@@ -1351,6 +1416,7 @@
                     lastAutomaticWithdrawalTime = now;
                     updateBalanceDisplay(); // Update UI
                     updateCooldownDisplay(); // Update UI
+                    triggerCoinRain(amountToWithdraw, selectedCurrency); // Trigger coin rain for withdrawal
                 } catch (error) {
                     console.error("Error during automatic withdrawal:", error);
                     showAlert("Auto Withdrawal Failed", "An error occurred during automatic withdrawal. Please contact support.", "error");
@@ -1393,12 +1459,13 @@
         }
 
         // Function to format balance based on selected currency
-        function getFormattedBalance() {
+        function getFormattedBalance(value) {
+            const val = value !== undefined ? value : balance;
             const rate = exchangeRates[selectedCurrency];
             if (selectedCurrency === 'USD') {
-                return `$${balance.toFixed(2)}`;
+                return `$${val.toFixed(2)}`;
             } else {
-                return `${(balance * rate).toFixed(4)} ${selectedCurrency}`;
+                return `${(val * rate).toFixed(4)} ${selectedCurrency}`;
             }
         }
 
@@ -1406,7 +1473,13 @@
         function updateBalanceDisplay() {
             const balanceElement = document.getElementById('current-balance-display');
             if (balanceElement) {
-                balanceElement.textContent = getFormattedBalance();
+                // If the actual balance has changed, start the animation
+                if (balance !== displayedBalance) {
+                    animateBalance(balanceElement, displayedBalance, balance);
+                } else {
+                    // Otherwise, just update the text content directly (e.g., on initial load or currency change)
+                    balanceElement.textContent = getFormattedBalance(balance);
+                }
             }
             const adsWatchedElement = document.getElementById('ads-watched-display');
             if (adsWatchedElement) {
@@ -1418,7 +1491,7 @@
             }
             const withdrawalCurrentBalance = document.getElementById('withdrawal-current-balance');
             if (withdrawalCurrentBalance) {
-                withdrawalCurrentBalance.textContent = getFormattedBalance();
+                withdrawalCurrentBalance.textContent = getFormattedBalance(balance);
             }
             const tasksCompletedDisplay = document.getElementById('tasks-completed-display');
             if (tasksCompletedDisplay) {
@@ -1432,11 +1505,51 @@
             if (referralEarningsDisplay) {
                 referralEarningsDisplay.textContent = `$${referralEarnings.toFixed(2)}`;
             }
+            // Update unclaimed referral balance on referral page
+            const unclaimedReferralBalanceDisplay = document.getElementById('unclaimed-referral-balance-display');
+            if (unclaimedReferralBalanceDisplay) {
+                unclaimedReferralBalanceDisplay.textContent = `$${unclaimedReferralBalance.toFixed(2)}`;
+            }
+            const claimReferralButton = document.getElementById('claim-referral-earnings-button');
+            if (claimReferralButton) {
+                claimReferralButton.disabled = unclaimedReferralBalance <= 0;
+            }
+        }
+
+        // Balance counting animation logic
+        let animationFrameId = null;
+        function animateBalance(element, startValue, endValue) {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+
+            const duration = 1000; // 1 second
+            let startTime = null;
+
+            function step(currentTime) {
+                if (!startTime) startTime = currentTime;
+                const progress = (currentTime - startTime) / duration;
+
+                if (progress < 1) {
+                    const easedProgress = 0.5 - Math.cos(progress * Math.PI) / 2; // Ease-in-out
+                    displayedBalance = startValue + (endValue - startValue) * easedProgress;
+                    element.textContent = getFormattedBalance(displayedBalance);
+                    animationFrameId = requestAnimationFrame(step);
+                } else {
+                    displayedBalance = endValue;
+                    element.textContent = getFormattedBalance(displayedBalance);
+                    animationFrameId = null;
+                }
+            }
+            animationFrameId = requestAnimationFrame(step);
         }
 
         function renderAuthPage() {
             const mainContent = document.getElementById('main-content');
             document.getElementById('app-header').classList.add('hidden'); // Hide header on auth page
+            // Hide loading message
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) loadingMessage.classList.add('hidden');
 
             mainContent.innerHTML = `
                 <div class="p-6 bg-gray-800 rounded-xl shadow-2xl border border-gray-700 text-gray-100 max-w-md w-full mx-auto">
@@ -1515,6 +1628,9 @@
         function renderDashboardPage() {
             const mainContent = document.getElementById('main-content');
             document.getElementById('app-header').classList.remove('hidden'); // Show header on dashboard
+            // Hide loading message
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) loadingMessage.classList.add('hidden');
 
             mainContent.innerHTML = `
                 <div class="p-6 bg-gray-800 rounded-xl shadow-2xl border border-gray-700 text-gray-100">
@@ -1523,7 +1639,7 @@
                     <!-- Balance Display -->
                     <div class="bg-gradient-to-r from-blue-700 to-purple-800 text-white p-6 rounded-xl shadow-lg mb-8 flex flex-col items-center border border-blue-600 shadow-custom-blue">
                         <p class="text-lg font-semibold mb-2 font-heading">Current Balance:</p>
-                        <p id="current-balance-display" class="text-5xl font-bold mb-4 font-heading">${getFormattedBalance()}</p>
+                        <p id="current-balance-display" class="text-5xl font-bold mb-4 font-heading">${getFormattedBalance(displayedBalance)}</p>
                         <div class="flex items-center space-x-2">
                             <label for="currency-select" class="text-sm font-heading">Display in:</label>
                             <select id="currency-select" class="bg-white bg-opacity-20 text-white rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-white font-heading">
@@ -1555,12 +1671,12 @@
 
                     <!-- Referral Earnings Summary -->
                     <div class="bg-gray-900 p-6 rounded-xl shadow-md mb-8 border border-gray-700">
-                        <h3 class="text-2xl font-semibold text-gray-200 mb-4 font-heading">Referral Earnings</h3>
+                        <h3 class="text-2xl font-semibold text-gray-200 mb-4 font-heading">Referral Earnings (Claimed)</h3>
                         <div class="flex items-center justify-between">
-                            <p class="text-lg text-gray-300 font-heading">Total Earned from Referrals:</p>
+                            <p class="text-lg text-gray-300 font-heading">Total Claimed from Referrals:</p>
                             <p id="referral-earnings-display" class="text-2xl font-bold text-green-400 font-heading">$${referralEarnings.toFixed(2)}</p>
                         </div>
-                        <p class="text-gray-400 text-sm mt-2 text-center">Invite friends and earn $10 for each successful referral!</p>
+                        <p class="text-gray-400 text-sm mt-2 text-center">Invite friends and earn $30 for each successful referral into your unclaimed balance!</p>
                     </div>
 
 
@@ -1622,12 +1738,15 @@
                     array[randomIndex], array[currentIndex]];
             }
             return array;
-        }
+            }
 
         function renderWatchAdsPage() {
             const mainContent = document.getElementById('main-content');
             // Create a shuffled copy of adImageUrls for this render session
             const shuffledAdImageUrls = shuffleArray([...adImageUrls]);
+            // Hide loading message
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) loadingMessage.classList.add('hidden');
 
             mainContent.innerHTML = `
                 <div class="p-6 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 text-gray-100">
@@ -1677,18 +1796,12 @@
         function renderSpinRollPage() {
             const mainContent = document.getElementById('main-content');
             const spinTimeLeft = calculateTimeLeft(spinCooldownEndTime);
+            // Hide loading message
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) loadingMessage.classList.add('hidden');
 
-            // Define segments for the spin wheel (values from $5 to $30)
-            const segments = [
-                { value: 5, display: "$5", color: "#FF6347" },
-                { value: 7, display: "$7", color: "#4CAF50" },
-                { value: 10, display: "$10", color: "#2196F3" },
-                { value: 12, display: "$12", color: "#9C27B0" },
-                { value: 15, display: "$15", color: "#FF9800" },
-                { value: 20, display: "$20", color: "#673AB7" },
-                { value: 25, display: "$25", color: "#00BCD4" },
-                { value: 30, display: "$30", color: "#FFEB3B" }
-            ];
+            // Define segments for the spin wheel (values from $0.50 to $20.00)
+            const segments = spinSegments; // Use the updated global spinSegments
             const numSegments = segments.length;
             const anglePerSegment = 360 / numSegments;
             const radius = 100; // SVG coordinate system radius
@@ -1712,6 +1825,8 @@
 
                 svgSegments += `
                     <path
+                        id="segment-path-${index}"
+                        class="spin-wheel-segment-path"
                         d="M 50 50 L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY} Z"
                         fill="${segment.color}"
                         stroke="#1f2937" stroke-width="1"
@@ -1735,7 +1850,7 @@
             mainContent.innerHTML = `
                 <div class="p-6 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 flex flex-col items-center text-gray-100">
                     <h2 class="text-3xl font-extrabold text-gray-100 mb-6 text-center font-heading">Spin & Win!</h2>
-                    <p class="text-gray-300 mb-8 text-center">Click the button to spin the wheel and earn between $5 and $30! You can spin once every 5 hours.</p>
+                    <p class="text-gray-300 mb-8 text-center">Click the button to spin the wheel and earn between $0.50 and $20.00! You can spin once every 10 hours.</p>
 
                     <!-- Advanced Spin Wheel SVG -->
                     <div class="spin-wheel-container">
@@ -1766,6 +1881,9 @@
         function renderTasksPage() {
             const mainContent = document.getElementById('main-content');
             const taskTimeLeft = calculateTimeLeft(taskCooldownEndTime);
+            // Hide loading message
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) loadingMessage.classList.add('hidden');
 
             mainContent.innerHTML = `
                 <div class="p-6 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 text-gray-100">
@@ -1819,11 +1937,14 @@
         function renderReferralPage() {
             const mainContent = document.getElementById('main-content');
             const referralLink = `${BASE_APP_URL}?ref=${referralCode}`; // Construct the full referral link
+            // Hide loading message
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) loadingMessage.classList.add('hidden');
 
             mainContent.innerHTML = `
                 <div class="p-6 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 text-gray-100">
                     <h2 class="text-3xl font-extrabold text-gray-100 mb-6 text-center font-heading">Referral Program</h2>
-                    <p class="text-gray-300 mb-8 text-center">Invite your friends to join and earn <span class="font-bold text-green-400">$10.00</span> for each successful referral!</p>
+                    <p class="text-gray-300 mb-8 text-center">Invite your friends to join and earn <span class="font-bold text-green-400">$30.00</span> for each successful referral!</p>
 
                     <div class="bg-gray-900 p-6 rounded-xl shadow-md mb-8 border border-gray-700 text-center">
                         <p class="text-lg text-gray-300 font-heading mb-2">Your Unique Referral Link:</p>
@@ -1848,9 +1969,18 @@
                             <p id="total-referrals-display" class="text-4xl font-bold text-green-400">${totalReferrals}</p>
                         </div>
                         <div class="bg-gray-900 p-6 rounded-xl shadow-md border border-gray-700 text-center">
-                            <p class="text-lg text-gray-300 font-heading mb-2">Total Referral Earnings:</p>
+                            <p class="text-lg text-gray-300 font-heading mb-2">Total Claimed Earnings:</p>
                             <p id="referral-earnings-page-display" class="text-4xl font-bold text-green-400">$${referralEarnings.toFixed(2)}</p>
                         </div>
+                    </div>
+
+                    <!-- Unclaimed Referral Balance and Claim Button -->
+                    <div class="bg-gray-900 p-6 rounded-xl shadow-md mb-8 border border-yellow-600 text-center">
+                        <p class="text-lg text-gray-300 font-heading mb-2">Unclaimed Referral Balance:</p>
+                        <p id="unclaimed-referral-balance-display" class="text-4xl font-bold text-yellow-400">$${unclaimedReferralBalance.toFixed(2)}</p>
+                        <button id="claim-referral-earnings-button" class="mt-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-3 px-6 rounded-lg shadow-md transform hover:scale-105 transition duration-300 border border-green-500 font-heading" ${unclaimedReferralBalance <= 0 ? 'disabled' : ''}>
+                            <i class="fas fa-hand-holding-usd"></i> Claim Earnings
+                        </button>
                     </div>
 
                     <p id="referral-cooldown-message" class="text-red-400 mt-4 text-center font-medium font-heading hidden">
@@ -1879,6 +2009,8 @@
                 document.body.removeChild(textarea);
             });
 
+            document.getElementById('claim-referral-earnings-button').addEventListener('click', handleClaimReferralEarnings); // New event listener
+
             document.getElementById('referral-back-button').addEventListener('click', () => renderPage('dashboard'));
             updateCooldownDisplay(); // Update referral cooldown on page load
         }
@@ -1887,11 +2019,14 @@
         function renderWithdrawalPage() {
             const mainContent = document.getElementById('main-content');
             const autoWithdrawalTimeLeft = calculateTimeLeft(lastAutomaticWithdrawalTime + AUTO_WITHDRAWAL_COOLDOWN_MS);
+            // Hide loading message
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) loadingMessage.classList.add('hidden');
 
             mainContent.innerHTML = `
                 <div class="p-6 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 text-gray-100">
                     <h2 class="text-3xl font-extrabold text-gray-100 mb-6 text-center font-heading">Withdraw Your Earnings</h2>
-                    <p class="text-gray-300 mb-6 text-center">Current Balance: <span class="font-bold text-blue-400" id="withdrawal-current-balance">${getFormattedBalance()}</span></p>
+                    <p class="text-gray-300 mb-6 text-center">Current Balance: <span class="font-bold text-blue-400" id="withdrawal-current-balance">${getFormattedBalance(balance)}</span></p>
                     <p class="text-gray-300 mb-6 text-center text-sm">
                         Minimum balance for automatic withdrawal: <span class="font-bold text-green-400">$${MIN_WITHDRAWAL_AMOUNT.toFixed(2)}</span>
                     </p>
@@ -2036,6 +2171,10 @@
 
         function renderPrivacyPage() {
             const mainContent = document.getElementById('main-content');
+            // Hide loading message
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) loadingMessage.classList.add('hidden');
+
             mainContent.innerHTML = `
                 <div class="p-6 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 text-gray-100">
                     <h2 class="text-3xl font-extrabold text-gray-100 mb-6 text-center font-heading">Ad Privacy Policy</h2>
@@ -2064,6 +2203,12 @@
         }
 
         function renderPage(page) {
+            console.log(`Attempting to render page: ${page}`);
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) {
+                loadingMessage.classList.add('hidden'); // Hide loading message as soon as renderPage is called
+            }
+
             currentPage = page;
             const navButtons = document.querySelectorAll('header nav button');
             navButtons.forEach(button => {
@@ -2110,14 +2255,17 @@
                 case 'withdrawal':
                     renderWithdrawalPage();
                     break;
-                case 'privacy':
-                    renderPrivacyPage();
+                default: // Fallback to auth or dashboard if not recognized
+                    if (userId) {
+                        renderDashboardPage();
+                    } else {
+                        renderAuthPage();
+                    }
                     break;
-                default:
-                    renderAuthPage(); // Default to auth page if not logged in
             }
             updateBalanceDisplay(); // Always update display after rendering page
             updateCooldownDisplay(); // Always update cooldown display
+            console.log(`Page ${page} rendered.`);
         }
 
         // --- Background Canvas Animation Logic ---
@@ -2133,6 +2281,7 @@
             window.addEventListener('resize', resizeCanvas);
             createParticles();
             animateParticles();
+            console.log("Background canvas initialized.");
         }
 
         function resizeCanvas() {
@@ -2178,6 +2327,203 @@
             requestAnimationFrame(animateParticles);
         }
 
+        // --- Three.js Coin Rain Effect ---
+        let coinScene, coinCamera, coinRenderer, coinParticles = [];
+        let coinRainActive = false;
+        // Increased coin size: radius 0.7, height 0.15 (from 0.5, 0.1)
+        const coinGeometry = new THREE.CylinderGeometry(0.7, 0.7, 0.15, 32);
+        const coinMaterialUSD = new THREE.MeshLambertMaterial({ color: 0xFFD700 }); // Gold color for USD
+        const coinMaterialUSDT = new THREE.MeshLambertMaterial({ color: 0xADD8E6 }); // LightBlue for USDT
+        const coinMaterialXRP = new THREE.MeshLambertMaterial({ color: 0x8A2BE2 }); // BlueViolet for XRP
+        const coinMaterialDefault = new THREE.MeshLambertMaterial({ color: 0xC0C0C0 }); // Default silver for others
+
+        // Define gravity and bounce factor globally
+        const gravity = -0.05; // Downward acceleration
+        const bounceFactor = -0.6; // How much velocity is retained on bounce
+        let floorY; // Will be calculated once coinCamera is initialized
+
+        function initCoinRainCanvas() {
+            const coinCanvas = document.getElementById('coin-rain-canvas');
+            coinScene = new THREE.Scene();
+            coinCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            coinRenderer = new THREE.WebGLRenderer({ canvas: coinCanvas, alpha: true, antialias: true }); // alpha: true for transparency
+            coinRenderer.setSize(window.innerWidth, window.innerHeight);
+            coinRenderer.setClearColor(0x000000, 0); // Transparent background
+
+            // Add ambient light
+            coinScene.add(new THREE.AmbientLight(0x404040));
+            // Add directional light for shadows and definition
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(0, 1, 1).normalize();
+            coinScene.add(directionalLight);
+
+            coinCamera.position.z = 50; // Adjust camera distance
+            floorY = - (coinCamera.position.z / 2) * 0.8; // Calculate floorY after camera is set
+
+            window.addEventListener('resize', onCoinRainWindowResize);
+            animateCoinRain();
+            console.log("Coin rain canvas initialized.");
+        }
+
+        function onCoinRainWindowResize() {
+            const coinCanvas = document.getElementById('coin-rain-canvas');
+            coinCamera.aspect = window.innerWidth / window.innerHeight;
+            coinCamera.updateProjectionMatrix();
+            coinRenderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Modified to accept currency type
+        function createCoinMesh(currencyType) {
+            let material;
+            switch (currencyType) {
+                case 'USD':
+                    material = coinMaterialUSD;
+                    break;
+                case 'USDT':
+                    material = coinMaterialUSDT;
+                    break;
+                case 'XRP':
+                    material = coinMaterialXRP;
+                    break;
+                // Add more cases for other cryptocurrencies if needed
+                default:
+                    material = coinMaterialDefault; // Default to silver for unspecified
+            }
+            const coin = new THREE.Mesh(coinGeometry, material);
+            // Increased scale for larger coins: 1.2 to 2.0 times the base geometry
+            coin.scale.set(Math.random() * 0.8 + 1.2, Math.random() * 0.8 + 1.2, 1);
+            return coin;
+        }
+
+        // Modified to accept currency type
+        function triggerCoinRain(amount, currencyType) {
+            // Add a check here to ensure coinCamera is initialized
+            if (!coinCamera || !coinCamera.position) {
+                console.warn("Coin rain not triggered: coinCamera not initialized.");
+                return;
+            }
+
+            const coinCanvas = document.getElementById('coin-rain-canvas');
+            coinCanvas.classList.remove('hidden');
+            coinRainActive = true;
+            coinParticles = []; // Clear existing coins
+
+            // Increased number of coins: amount * 15 (from amount * 5), max 200 (from 100)
+            const numCoins = Math.min(Math.floor(amount * 15), 200);
+
+            for (let i = 0; i < numCoins; i++) {
+                const coin = createCoinMesh(currencyType); // Pass currencyType
+                coin.position.x = (Math.random() - 0.5) * (coinCamera.aspect * coinCamera.position.z * 1.5); // Spread across screen width
+                coin.position.y = (Math.random() * 20) + (coinCamera.position.z / 2); // Start above screen, varied height
+                coin.position.z = (Math.random() - 0.5) * 10; // Z-depth for perspective
+
+                coin.rotation.x = Math.random() * Math.PI * 2;
+                coin.rotation.y = Math.random() * Math.PI * 2;
+                coin.rotation.z = Math.random() * Math.PI * 2;
+
+                coinScene.add(coin);
+                coinParticles.push({
+                    mesh: coin,
+                    velocity: new THREE.Vector3( (Math.random() - 0.5) * 0.5, -0.5 - Math.random() * 0.5, (Math.random() - 0.5) * 0.2), // Random horizontal/depth velocity, downward
+                    rotationSpeed: new THREE.Vector3(Math.random() * 0.1, Math.random() * 0.1, Math.random() * 0.1),
+                    opacity: 1.0,
+                    fadeStartTime: 0 // Will be set when coin hits bottom
+                });
+            }
+        }
+
+        function animateCoinRain() {
+            requestAnimationFrame(animateCoinRain);
+
+            // Add a check here to ensure coinRenderer, coinScene, and coinCamera are initialized before rendering
+            if (!coinRenderer || !coinScene || !coinCamera) {
+                return;
+            }
+
+            if (!coinRainActive && coinParticles.length === 0) {
+                return; // Only animate if there are coins or rain is active
+            }
+
+            const coinsToRemove = [];
+            coinParticles.forEach((p, index) => {
+                // Defensive check: Ensure mesh and its position exist
+                if (!p || !p.mesh || !p.mesh.position || !p.velocity || !p.rotationSpeed) {
+                    console.warn("Skipping coin particle due to missing properties:", p);
+                    coinsToRemove.push(index);
+                    return; // Skip this iteration
+                }
+
+                // Apply gravity
+                p.velocity.y += gravity;
+                p.mesh.position.add(p.velocity);
+
+                // Apply rotation
+                p.mesh.rotation.x += p.rotationSpeed.x;
+                p.mesh.rotation.y += p.rotationSpeed.y;
+                p.mesh.rotation.z += p.rotationSpeed.z;
+
+                // Simple floor collision and bounce
+                if (p.mesh.position.y < floorY) {
+                    p.mesh.position.y = floorY; // Snap to floor
+                    p.velocity.y *= bounceFactor; // Reverse and reduce vertical velocity
+                    p.velocity.x *= 0.8; // Reduce horizontal velocity
+                    p.velocity.z *= 0.8; // Reduce depth velocity
+                    p.rotationSpeed.multiplyScalar(0.5); // Reduce rotation speed
+                    if (Math.abs(p.velocity.y) < 0.1 && Math.abs(p.velocity.x) < 0.1 && Math.abs(p.velocity.z) < 0.1) {
+                        // If coin has almost stopped, start fading
+                        if (p.fadeStartTime === 0) {
+                            p.fadeStartTime = Date.now();
+                        }
+                    }
+                }
+
+                // Fade out and remove
+                if (p.fadeStartTime > 0) {
+                    const fadeDuration = 1000; // 1 second fade
+                    const fadeProgress = (Date.now() - p.fadeStartTime) / fadeDuration;
+                    p.opacity = Math.max(0, 1 - fadeProgress);
+                    if (p.mesh.material.opacity !== undefined) { // Check if material supports opacity
+                        p.mesh.material.opacity = p.opacity;
+                        p.mesh.material.transparent = true; // Enable transparency
+                    }
+                    if (p.opacity <= 0) {
+                        coinsToRemove.push(index);
+                    }
+                }
+            });
+
+            // Remove coins that have faded out
+            for (let i = coinsToRemove.length - 1; i >= 0; i--) {
+                const index = coinsToRemove[i];
+                // Ensure the mesh exists before trying to remove it from the scene and dispose
+                if (coinParticles[index] && coinParticles[index].mesh) {
+                    coinScene.remove(coinParticles[index].mesh);
+                    // Dispose of geometry and material to prevent memory leaks
+                    if (coinParticles[index].mesh.geometry) {
+                        coinParticles[index].mesh.geometry.dispose();
+                    }
+                    if (coinParticles[index].mesh.material) {
+                        // If material is an array (e.g., for multi-material objects), iterate and dispose
+                        if (Array.isArray(coinParticles[index].mesh.material)) {
+                            coinParticles[index].mesh.material.forEach(m => m.dispose());
+                        } else {
+                            coinParticles[index].mesh.material.dispose();
+                        }
+                    }
+                }
+                coinParticles.splice(index, 1);
+            }
+
+            // If all coins are gone, hide the canvas
+            if (coinParticles.length === 0 && coinRainActive) {
+                document.getElementById('coin-rain-canvas').classList.add('hidden');
+                coinRainActive = false;
+            }
+
+            coinRenderer.render(coinScene, coinCamera);
+        }
+
+
         // Function to parse URL for referral code
         function getReferralCodeFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -2186,93 +2532,164 @@
 
         // --- Initialize App ---
         document.addEventListener('DOMContentLoaded', async () => {
+            console.log("DOM Content Loaded. Starting app initialization.");
             // Initialize Firebase with your specific details
-            const firebaseConfig = {
-                apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
-                authDomain: "adwatchrewardsapp.firebaseapp.com",
-                projectId: "adwatchrewardsapp",
-                storageBucket: "adwatchrewardsapp.firebasestorage.app",
-                messagingSenderId: "782268735936",
-                appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
-                measurementId: "G-4NG2564HTK"
-            };
-            
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
+            // Use global __firebase_config if available, otherwise use placeholders
+            let firebaseConfig;
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                try {
+                    firebaseConfig = JSON.parse(__firebase_config);
+                    console.log("Firebase config loaded from __firebase_config.");
+                } catch (e) {
+                    console.error("Error parsing __firebase_config:", e);
+                    // Fallback to placeholder if parsing fails
+                    firebaseConfig = {
+                        apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY", // Replace with your actual Firebase API Key
+                        authDomain: "adwatchrewardsapp.firebaseapp.com", // Replace with your actual Firebase Auth Domain
+                        projectId: "adwatchrewardsapp", // Replace with your actual Firebase Project ID
+                        storageBucket: "adwatchrewardsapp.firebasestorage.app", // Replace with your actual Firebase Storage Bucket
+                        messagingSenderId: "782268735936", // Replace with your actual Firebase Messaging Sender ID
+                        appId: "1:782268735936:web:ea82e5be5d0f44949ba825", // Replace with your actual Firebase App ID
+                        measurementId: "G-4NG2564HTK" // Replace with your actual Firebase Measurement ID
+                    };
+                    console.warn("Using placeholder Firebase config. PLEASE UPDATE THIS IN YOUR DEPLOYED CODE!");
+                }
+            } else {
+                firebaseConfig = {
+                    apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY", // Replace with your actual Firebase API Key
+                    authDomain: "adwatchrewardsapp.firebaseapp.com", // Replace with your actual Firebase Auth Domain
+                    projectId: "adwatchrewardsapp", // Replace with your actual Firebase Project ID
+                    storageBucket: "adwatchrewardsapp.firebasestorage.app", // Replace with your actual Firebase Storage Bucket
+                    messagingSenderId: "782268735936", // Replace with your actual Firebase Messaging Sender ID
+                    appId: "1:782268735936:web:ea82e5be5d0f44949ba825", // Replace with your actual Firebase App ID
+                    measurementId: "G-4NG2564HTK" // Replace with your actual Firebase Measurement ID
+                };
+                console.warn("No __firebase_config found. Using placeholder Firebase config. PLEASE UPDATE THIS IN YOUR DEPLOYED CODE!");
+            }
+
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                console.log("Firebase initialized successfully.");
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                showAlert("Initialization Error", `Failed to connect to Firebase. Error: ${error.message}. Please check your console for details.`, "error");
+                // Attempt to render auth page even if Firebase init fails, so user isn't stuck on "Loading..."
+                renderPage('auth');
+                return; // Stop further execution if Firebase fails to initialize
+            }
+
+            // Initial authentication check using __initial_auth_token
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token !== null && __initial_auth_token !== '') {
+                try {
+                    console.log("Attempting sign-in with custom token.");
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                    console.log("Signed in with custom token.");
+                } catch (error) {
+                    console.error("Error signing in with custom token, falling back to anonymous:", error);
+                    await signInAnonymously(auth);
+                    console.log("Signed in anonymously after custom token failure.");
+                }
+            } else {
+                console.log("No custom token found, signing in anonymously.");
+                await signInAnonymously(auth);
+                console.log("Signed in anonymously.");
+            }
 
             initCanvas(); // Initialize background canvas animation
-            
+            initCoinRainCanvas(); // Initialize 3D coin rain canvas
+
             // Check for referral code in URL immediately on load
             activeReferralCode = getReferralCodeFromUrl();
 
-            // Set up Auth state listener
+            // Set up Auth state listener (this will now react to the initial sign-in above)
             onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    userId = user.uid;
-                    // Listen for real-time updates to user data
-                    const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile/data`);
-                    onSnapshot(userDocRef, (docSnap) => {
-                        if (docSnap.exists()) {
-                            const data = docSnap.data();
-                            balance = data.balance || 0;
-                            adsWatched = data.adsWatched || 0;
-                            cooldownEndTime = data.cooldownEndTime || 0;
-                            spinCooldownEndTime = data.spinCooldownEndTime || 0;
-                            tasksCompleted = data.tasksCompleted || 0;
-                            taskCooldownEndTime = data.taskCooldownEndTime || 0;
-                            referralCode = data.referralCode || '';
-                            totalReferrals = data.totalReferrals || 0;
-                            referralEarnings = data.referralEarnings || 0;
-                            savedWithdrawalMethod = data.withdrawalMethod || null; // Load saved method
-                            savedWithdrawalAddress = data.withdrawalAddress || null; // Load saved address
-                            lastAutomaticWithdrawalTime = data.lastAutomaticWithdrawalTime || 0; // Load last auto withdrawal time
-                            
-                            isAuthReady = true; // Data loaded
-                            renderPage('dashboard'); // Render dashboard after data is loaded
-                            checkAndProcessAutomaticWithdrawal(); // Check for auto withdrawal
-                        } else {
-                            // User exists but no profile data (e.g., new anonymous user or new email/password user)
-                            // This case is handled in createAccount/loginAsGuest now, so it should create a profile.
-                            // If it still happens here, it means something went wrong with initial profile creation.
-                            console.warn("User profile not found for existing user:", userId, "Attempting to create default profile.");
-                            const newReferralCode = generateReferralCode(userId);
-                            createOrUpdateUserProfile(userId, {
-                                balance: 0,
-                                adsWatched: 0,
-                                cooldownEndTime: 0,
-                                spinCooldownEndTime: 0,
-                                tasksCompleted: 0,
-                                taskCooldownEndTime: 0,
-                                referralCode: newReferralCode,
-                                totalReferrals: 0,
-                                referralEarnings: 0,
-                                referredBy: null,
-                                withdrawalMethod: null, // Initialize
-                                withdrawalAddress: null, // Initialize
-                                lastAutomaticWithdrawalTime: 0, // Initialize
-                                createdAt: Date.now()
-                            }).then(() => {
-                                isAuthReady = true;
-                                renderPage('dashboard');
-                            }).catch(error => {
-                                console.error("Error creating default profile for existing user:", error);
-                                showAlert("Error", "Failed to initialize user profile.", "error");
-                                isAuthReady = true;
-                                renderPage('auth');
-                            });
-                        }
-                    }, (error) => {
-                        console.error("Error listening to user data:", error);
-                        showAlert("Data Sync Error", "Failed to load user data in real-time.", "error");
-                        isAuthReady = true; // Still mark as ready
-                        renderPage('auth'); // Fallback to auth
-                    });
-                } else {
-                    // No user is signed in.
-                    userId = null;
-                    isAuthReady = true; // Auth state checked
-                    renderPage('auth');
+                console.log("Auth state changed. User:", user ? user.uid : "null");
+                try {
+                    if (user) {
+                        userId = user.uid;
+                        // Listen for real-time updates to user data
+                        const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile/data`);
+                        onSnapshot(userDocRef, (docSnap) => {
+                            console.log("User data snapshot received.");
+                            if (docSnap.exists()) {
+                                const data = docSnap.data();
+                                console.log("User data:", data);
+                                // Only update balance if it's different to trigger animation
+                                if (balance !== data.balance) {
+                                    displayedBalance = balance; // Set starting point for animation
+                                    balance = data.balance || 0;
+                                } else {
+                                    balance = data.balance || 0;
+                                    displayedBalance = balance; // If no change, keep displayed and actual in sync
+                                }
+
+                                adsWatched = data.adsWatched || 0;
+                                cooldownEndTime = data.cooldownEndTime || 0;
+                                spinCooldownEndTime = data.spinCooldownEndTime || 0;
+                                tasksCompleted = data.tasksCompleted || 0;
+                                taskCooldownEndTime = data.taskCooldownEndTime || 0;
+                                referralCode = data.referralCode || '';
+                                totalReferrals = data.totalReferrals || 0;
+                                referralEarnings = data.referralEarnings || 0;
+                                unclaimedReferralBalance = data.unclaimedReferralBalance || 0; // Load unclaimed balance
+                                savedWithdrawalMethod = data.withdrawalMethod || null; // Load saved method
+                                savedWithdrawalAddress = data.withdrawalAddress || null; // Load saved address
+                                lastAutomaticWithdrawalTime = data.lastAutomaticWithdrawalTime || 0; // Load last auto withdrawal time
+                                
+                                isAuthReady = true; // Data loaded
+                                renderPage('dashboard'); // Render dashboard after data is loaded
+                                checkAndProcessAutomaticWithdrawal(); // Check for auto withdrawal
+                            } else {
+                                // User exists but no profile data (e.g., new anonymous user or new email/password user)
+                                console.warn("User profile not found for existing user:", userId, "Attempting to create default profile.");
+                                const newReferralCode = generateReferralCode(userId);
+                                createOrUpdateUserProfile(userId, {
+                                    balance: 0,
+                                    adsWatched: 0,
+                                    cooldownEndTime: 0,
+                                    spinCooldownEndTime: 0,
+                                    tasksCompleted: 0,
+                                    taskCooldownEndTime: 0,
+                                    referralCode: newReferralCode,
+                                    totalReferrals: 0,
+                                    referralEarnings: 0,
+                                    unclaimedReferralBalance: 0, // Initialize
+                                    referredBy: null,
+                                    withdrawalMethod: null, // Initialize
+                                    withdrawalAddress: null, // Initialize
+                                    lastAutomaticWithdrawalTime: 0, // Initialize
+                                    createdAt: Date.now()
+                                }).then(() => {
+                                    isAuthReady = true;
+                                    renderPage('dashboard');
+                                    console.log("Default profile created and dashboard rendered.");
+                                }).catch(error => {
+                                    console.error("Error creating default profile for existing user:", error);
+                                    showAlert("Error", `Failed to initialize user profile. Error: ${error.message}`, "error");
+                                    isAuthReady = true;
+                                    renderPage('auth');
+                                });
+                            }
+                        }, (error) => {
+                            console.error("Error listening to user data:", error);
+                            showAlert("Data Sync Error", `Failed to load user data in real-time. Error: ${error.message}`, "error");
+                            isAuthReady = true; // Still mark as ready
+                            renderPage('auth'); // Fallback to auth
+                        });
+                    } else {
+                        // No user is signed in.
+                        userId = null;
+                        isAuthReady = true; // Auth state checked
+                        renderPage('auth');
+                        console.log("No user signed in, rendering auth page.");
+                    }
+                } catch (authError) {
+                    console.error("Error in onAuthStateChanged callback:", authError);
+                    showAlert("Authentication Error", `An error occurred during authentication. Error: ${authError.message}`, "error");
+                    isAuthReady = true;
+                    renderPage('auth'); // Ensure auth page is rendered even on auth listener error
                 }
             });
 
