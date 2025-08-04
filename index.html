@@ -3407,5 +3407,415 @@
             }, 1000);
         });
     </script>
+    <script>
+    // Ensure the DOM is fully loaded before running script
+    document.addEventListener('DOMContentLoaded', function() {
+        const notification = document.getElementById('notification');
+        const notificationTextElement = document.getElementById('notificationText');
+        const chatIcon = document.getElementById('chatIcon');
+        const chatWindow = document.getElementById('chatWindow');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatOptions = document.getElementById('chatOptions');
+        const chatCloseBtn = document.getElementById('chatCloseBtn');
+        const fiverrCardContainer = document.getElementById('fiverrCardContainer');
+        const adNetworkCardsWrapper = document.getElementById('adNetworkCardsWrapper');
+        const adsterraCardItem = document.getElementById('adsterraCardItem');
+        const monetagCardItem = document.getElementById('monetagCardItem');
+        const hiltopCardItem = document.getElementById('hiltopCardItem');
+        const adNetworkCardItems = [adsterraCardItem, monetagCardItem, hiltopCardItem];
+        const watermarkOverlay = document.getElementById('watermarkOverlay'); // New: Watermark element
+        const facebookIconContainer = document.getElementById('facebookIconContainer'); // New: Facebook icon element
+
+        const fiverrProfileLink = 'https://www.fiverr.com/nadeembugti1/a-reward-points-website-for-task-based-user-engagement';
+        const facebookPageLink = 'https://www.facebook.com/share/1E9X664i3Z/'; // New: Facebook link
+
+        const fullNotificationText = `We build this type of website for you, where you can earn money and increase your profit in <span class="text-adsterra">ADSTERRA</span>, <span class="text-monetage">Monetage</span>, <span class="text-hiltop">Hiltop</span>, and other ad networks.`;
+        const packagesDetails = `
+            Welcome to Your Website Growth Package!
+            Here are demo websites:
+            <a href="https://rangwanii0007.github.io/firbase/" target="_blank" class="text-blue-400 hover:underline">https://rangwanii0007.github.io/firbase/</a>
+            <a href="https://rangwanii0007.github.io/watch.4433/" target="_blank" class="text-blue-400 hover:underline">https://rangwanii0007.github.io/watch.4433/</a>
+            There you can increase your revenue 100% X.
+            We help you build and rank your website using GitHub or Blogger, with free domain & hosting, expert support, and a revenue-driven plan. Whether you're just starting or want to scale fast, we've got the right plan for you!
+
+            <br><br>
+            <b>BASIC</b> $105 USDT
+            <ul>
+                <li>Website creation with GitHub or Blogger</li>
+                <li>Free domain & hosting</li>
+                <li>Mobile-friendly design</li>
+                <li>Fast delivery</li>
+            </ul>
+            <br>
+            <b>⭐ STANDARD</b> $260 USDT
+            <ul>
+                <li>Everything in BASIC</li>
+                <li>SEO & traffic help</li>
+                <li>Reach $500 revenue in 10 days</li>
+                <li>Full support guarantee</li>
+            </ul>
+            <br>
+            <b>BUMPER OFFER</b> $520 USDT
+            <ul>
+                <li>Everything in STANDARD</li>
+                <li>Reach $2,000 revenue in 30 days</li>
+                <li>Premium earning course included</li>
+                <li>24/7 VIP support</li>
+            </ul>
+            <br>
+            Whether you're looking to earn online, launch a blog, or build an affiliate site, we'll make it happen.
+            Let's start your online income journey today!
+        `;
+
+        let charIndex = 0;
+        let currentLine = '';
+        const typingSpeed = 40;
+        const cursorHtml = '<span class="typing-cursor">|</span>';
+
+        const cardMoveIntervals = {}; // To store intervals for each card's random movement
+        let isDragging = false;
+        let currentDraggedCard = null;
+        let initialClickX, initialClickY; // Store initial click position for drag detection
+        const clickThreshold = 5; // Pixels threshold to distinguish click from drag
+
+        /**
+         * Adds a message bubble to the chat window.
+         * @param {string} messageHtml - The HTML content of the message.
+         */
+        function addMessage(messageHtml) {
+            const bubble = document.createElement('div');
+            bubble.classList.add('chat-bubble');
+            bubble.innerHTML = messageHtml;
+            chatMessages.appendChild(bubble);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        /**
+         * Implements a character-by-character typing effect with a blinking cursor.
+         */
+        function typeWriter() {
+            notificationTextElement.innerHTML = currentLine;
+
+            if (charIndex < fullNotificationText.length) {
+                const char = fullNotificationText.charAt(charIndex);
+                if (char === '<') {
+                    const closingTagIndex = fullNotificationText.indexOf('>', charIndex);
+                    if (closingTagIndex !== -1) {
+                        currentLine += fullNotificationText.substring(charIndex, closingTagIndex + 1);
+                        charIndex = closingTagIndex + 1;
+                    } else {
+                        currentLine += char;
+                        charIndex++;
+                    }
+                } else {
+                    currentLine += char;
+                    charIndex++;
+                }
+                notificationTextElement.innerHTML = currentLine + cursorHtml;
+                setTimeout(typeWriter, typingSpeed);
+            } else {
+                notificationTextElement.innerHTML = currentLine + cursorHtml;
+                setTimeout(function() {
+                    notification.classList.remove('typing-center');
+                    notificationTextElement.style.display = 'none';
+                    chatIcon.style.display = 'flex';
+
+                    // Show Ad Network cards immediately after notification transitions
+                    setTimeout(function() {
+                        showAdNetworkCards();
+                        // Then, show watermark after ad cards have been visible for a short time
+                        setTimeout(showWatermark, 2000); // Watermark appears 2 seconds after ad cards start flying
+                    }, 600); // Give notification time to transition
+                }, 4000);
+            }
+        }
+
+        /**
+         * Toggles the chat window between collapsed icon and expanded chat.
+         * @param {boolean} [forceClose=false] - If true, forces the chat to close.
+         */
+        function toggleChat(forceClose = false) {
+            if (notification.classList.contains('chat-expanded') || forceClose) {
+                notification.classList.remove('chat-expanded');
+                chatWindow.style.opacity = '0';
+                chatWindow.style.pointerEvents = 'none';
+                chatIcon.style.display = 'flex';
+            } else {
+                notification.classList.add('chat-expanded');
+                chatIcon.style.display = 'none';
+                setTimeout(function() {
+                    chatWindow.style.opacity = '1';
+                    chatWindow.style.pointerEvents = 'auto';
+                    if (chatMessages.children.length === 0) {
+                        addMessage("Hello! How can I help you today?");
+                    }
+                }, 300);
+            }
+        }
+
+        /**
+         * Handles clicks on chat options.
+         * @param {Event} event - The click event.
+         */
+        function handleChatOptionClick(event) {
+            const option = event.target.dataset.option;
+            if (!option) return;
+
+            switch (option) {
+                case '1':
+                    addMessage(`Great! Click the Fiverr icon below to see a demo of our work and my profile.`);
+                    // Fiverr card is already flying, no explicit call needed here
+                    break;
+                case '2':
+                    addMessage(packagesDetails);
+                    break;
+                case '3':
+                    addMessage("Redirecting you to our order page on Fiverr...");
+                    setTimeout(function() {
+                        window.open(fiverrProfileLink, '_blank');
+                    }, 1000);
+                    break;
+            }
+        }
+
+        /**
+         * Shows the Fiverr card with a flying animation and makes it clickable.
+         */
+        function showFiverrCard() {
+            // Add the 'show' class to trigger the transition to its final position
+            fiverrCardContainer.classList.add('show');
+
+            // After the Fiverr card animation completes, make it clickable
+            setTimeout(function() {
+                fiverrCardContainer.style.cursor = 'pointer';
+                // Ensure the event listener is added only once
+                fiverrCardContainer.removeEventListener('click', openFiverrProfile); // Remove existing to prevent duplicates
+                fiverrCardContainer.addEventListener('click', openFiverrProfile);
+            }, 1500); // Matches the transition duration for the flight (1.5s)
+        }
+
+        /**
+         * Opens the Fiverr profile link.
+         */
+        function openFiverrProfile() {
+            window.open(fiverrProfileLink, '_blank');
+        }
+
+        /**
+         * Shows the three ad network cards and starts their random flying movement.
+         */
+        function showAdNetworkCards() {
+            adNetworkCardsWrapper.style.display = 'block'; // Make wrapper visible
+
+            adNetworkCardItems.forEach(function(cardItem) {
+                // Set initial random position for each card
+                setRandomPosition(cardItem);
+                cardItem.classList.add('show'); // Make card visible
+
+                // Start random movement for each card
+                cardMoveIntervals[cardItem.id] = setInterval(function() {
+                    if (!cardItem.isDragging) { // Only move if not being dragged
+                        setRandomPosition(cardItem);
+                    }
+                }, 3000 + Math.random() * 2000); // Move every 3-5 seconds
+
+                // Add drag-and-drop and click listeners
+                cardItem.addEventListener('mousedown', startDragging);
+                cardItem.addEventListener('touchstart', startDragging, { passive: false }); // For touch devices
+                
+                // Add a click listener for opening the link
+                cardItem.addEventListener('click', function(e) {
+                    // Only open link if it was a genuine click (not a drag)
+                    const currentClickX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const currentClickY = e.touches ? e.touches[0].clientY : e.clientY;
+                    const distanceMoved = Math.sqrt(
+                        Math.pow(currentClickX - initialClickX, 2) + 
+                        Math.pow(currentClickY - initialClickY, 2)
+                    );
+                    if (distanceMoved < clickThreshold) {
+                        openFiverrProfile(); // Open Fiverr link for ad network cards
+                    }
+                });
+            });
+        }
+
+        /**
+         * Sets a random position for a given card item within the viewport.
+         * @param {HTMLElement} cardItem - The card element to position.
+         */
+        function setRandomPosition(cardItem) {
+            // Get current viewport dimensions, accounting for scrollbars if any
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            const cardWidth = cardItem.offsetWidth;
+            const cardHeight = cardItem.offsetHeight;
+
+            // Ensure cards stay within visible area with a small margin
+            const minX = 20;
+            const minY = 20;
+            const maxX = viewportWidth - cardWidth - 20;
+            const maxY = viewportHeight - cardHeight - 20;
+            
+            const randomX = Math.max(minX, Math.floor(Math.random() * maxX));
+            const randomY = Math.max(minY, Math.floor(Math.random() * maxY));
+
+            cardItem.style.left = `${randomX}px`;
+            cardItem.style.top = `${randomY}px`;
+        }
+
+        /**
+         * Handles the start of dragging for a card.
+         * @param {MouseEvent|TouchEvent} e - The event object.
+         */
+        function startDragging(e) {
+            e.preventDefault(); // Prevent default browser drag behavior (e.g., image dragging)
+            isDragging = true;
+            currentDraggedCard = this; // 'this' refers to the cardItem clicked
+            currentDraggedCard.isDragging = true; // Custom property to pause its random movement
+
+            // Store initial click position for click vs drag detection
+            initialClickX = e.touches ? e.touches[0].clientX : e.clientX;
+            initialClickY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            // Bring the dragged card to the top layer
+            currentDraggedCard.style.zIndex = 1001;
+            currentDraggedCard.style.transition = 'none'; // Disable transition during drag
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            // Calculate offset from mouse to card's top-left corner
+            offsetX = clientX - currentDraggedCard.getBoundingClientRect().left;
+            offsetY = clientY - currentDraggedCard.getBoundingClientRect().top;
+
+            document.addEventListener('mousemove', dragCard);
+            document.addEventListener('mouseup', stopDragging);
+            document.addEventListener('touchmove', dragCard, { passive: false });
+            document.addEventListener('touchend', stopDragging);
+        }
+
+        /**
+         * Handles the dragging movement of a card.
+         * @param {MouseEvent|TouchEvent} e - The event object.
+         */
+        function dragCard(e) {
+            if (!isDragging || !currentDraggedCard) return;
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            let newX = clientX - offsetX;
+            let newY = clientY - offsetY;
+
+            // Keep card within viewport boundaries
+            const maxX = window.innerWidth - currentDraggedCard.offsetWidth;
+            const maxY = window.innerHeight - currentDraggedCard.offsetHeight;
+            newX = Math.max(0, Math.min(newX, maxX));
+            newY = Math.max(0, Math.min(newY, maxY));
+
+            currentDraggedCard.style.left = `${newX}px`;
+            currentDraggedCard.style.top = `${newY}px`;
+        }
+
+        /**
+         * Handles the end of dragging for a card.
+         */
+        function stopDragging(e) {
+            isDragging = false;
+            if (currentDraggedCard) {
+                currentDraggedCard.isDragging = false; // Resume random movement
+                currentDraggedCard.style.zIndex = 998; // Reset z-index
+                currentDraggedCard.style.transition = 'top 3s ease-in-out, left 3s ease-in-out, opacity 0.5s ease-out'; // Re-enable transition
+                currentDraggedCard = null;
+            }
+            document.removeEventListener('mousemove', dragCard);
+            document.removeEventListener('mouseup', stopDragging);
+            document.removeEventListener('touchmove', dragCard);
+            document.removeEventListener('touchend', stopDragging);
+        }
+
+        /**
+         * Shows the watermark overlay.
+         */
+        function showWatermark() {
+            watermarkOverlay.classList.add('show'); // Fade in watermark
+            setTimeout(function() {
+                watermarkOverlay.classList.remove('show'); // Start fade out
+                setTimeout(function() {
+                    watermarkOverlay.style.display = 'none'; // Hide completely after fade
+                    // After watermark fades, show Fiverr and Facebook icons
+                    showFiverrCard();
+                    showFacebookIcon();
+                }, 1000); // Matches watermark fade-out transition
+            }, 4000); // Watermark visible for 4 seconds
+        }
+
+        /**
+         * Shows the Facebook icon with a flying animation and makes it clickable/draggable.
+         */
+        function showFacebookIcon() {
+            facebookIconContainer.classList.add('show'); // Trigger flight animation
+
+            setTimeout(function() {
+                facebookIconContainer.style.cursor = 'pointer';
+                // The Facebook icon also uses the drag-and-drop logic for click detection
+                facebookIconContainer.removeEventListener('click', openFacebookPage); // Remove existing to prevent duplicates
+                facebookIconContainer.addEventListener('click', function(e) {
+                    // Only open link if it was a genuine click (not a drag)
+                    const currentClickX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const currentClickY = e.touches ? e.touches[0].clientY : e.clientY;
+                    const distanceMoved = Math.sqrt(
+                        Math.pow(currentClickX - initialClickX, 2) + 
+                        Math.pow(currentClickY - initialClickY, 2)
+                    );
+                    if (distanceMoved < clickThreshold) {
+                        openFacebookPage();
+                    }
+                });
+
+                // Add drag-and-drop listeners for Facebook icon
+                facebookIconContainer.addEventListener('mousedown', startDragging);
+                facebookIconContainer.addEventListener('touchstart', startDragging, { passive: false });
+            }, 1500); // Matches flight transition duration
+        }
+
+        /**
+         * Opens the Facebook page link.
+         */
+        function openFacebookPage() {
+            window.open(facebookPageLink, '_blank');
+        }
+
+        /**
+         * Shows the notification and starts the typing animation.
+         */
+        function showNotification() {
+            setTimeout(function() {
+                notification.classList.remove('notification-initial-hidden');
+                notification.classList.add('typing-center');
+                typeWriter();
+            }, 1000);
+        }
+
+        // --- Event Listeners ---
+        notification.addEventListener('click', function(event) {
+            // Prevent toggling if clicking the close button or inside the chat window
+            if (event.target === chatCloseBtn || event.target.closest('#chatWindow')) {
+                return;
+            }
+            toggleChat();
+        });
+
+        chatCloseBtn.addEventListener('click', function() {
+            toggleChat(true);
+        });
+
+        chatOptions.addEventListener('click', handleChatOptionClick);
+
+        // --- Initial Sequence ---
+        showNotification();
+    });
+</script>
 </body>
 </html>
