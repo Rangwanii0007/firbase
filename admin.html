@@ -1,30 +1,51 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Affiliate Dashboard</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Affiliate Leaderboard - Admin</title>
 <style>
-body{font-family:Arial,sans-serif;background:#f5f7fb;padding:20px;}
-.card{max-width:1200px;margin:0 auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 6px 18px rgba(20,20,40,0.06);}
-table{width:100%;border-collapse:collapse;margin-top:12px;}
-th,td{padding:10px;border:1px solid #eee;text-align:center;}
-th{background:#f0f6ff;}
-button{padding:5px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;}
-.small{font-size:13px;color:#666;}
+body{font-family:'Segoe UI',sans-serif;margin:0;background:#f0f3f7;}
+.login-box{display:flex;justify-content:center;align-items:center;height:100vh;}
+.login-form{background:#fff;padding:30px;border-radius:12px;box-shadow:0 8px 25px rgba(0,0,0,0.2);width:320px;text-align:center;}
+.login-form input{width:90%;padding:10px;margin:10px 0;border-radius:8px;border:1px solid #ccc;}
+.login-form button{padding:10px 20px;border:none;background:#4CAF50;color:#fff;font-weight:bold;border-radius:8px;cursor:pointer;}
+.dashboard{padding:20px;display:none;}
+h1{color:#333;text-align:center;}
+table{width:100%;border-collapse:collapse;margin-top:20px;box-shadow:0 4px 12px rgba(0,0,0,0.05);}
+th,td{text-align:center;padding:12px;border-bottom:1px solid #eee;}
+th{background:#4CAF50;color:white;position:sticky;top:0;}
+tr:hover{background:#f1f1f1;}
+.badge{padding:4px 8px;border-radius:8px;color:#fff;font-weight:bold;}
+.rank1{background:#FFD700;} .rank2{background:#C0C0C0;} .rank3{background:#CD7F32;}
+button.details-btn{padding:5px 10px;border:none;background:#2196F3;color:white;border-radius:6px;cursor:pointer;}
+#detailsModal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);justify-content:center;align-items:center;}
+#detailsContent{background:#fff;padding:20px;border-radius:12px;width:90%;max-width:800px;max-height:80vh;overflow:auto;}
+#closeModal{float:right;cursor:pointer;color:red;font-weight:bold;}
 </style>
 </head>
 <body>
 
-<div class="card" id="dashboard" style="display:none;">
-  <h2>Affiliate Leaderboard (Realtime)</h2>
-  <p class="small">Active = last 24h · Fake = same IP · Scores CPM-based</p>
-  <table>
+<!-- LOGIN -->
+<div id="loginBox" class="login-box">
+  <div class="login-form">
+    <h2>Admin Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button id="loginBtn">Login</button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="dashboard">
+  <h1>Affiliate Leaderboard (Realtime)</h1>
+  <div style="text-align:right;"><button id="exportCsv">Export CSV</button></div>
+  <table id="leaderboard">
     <thead>
       <tr>
         <th>Rank</th>
         <th>Name</th>
-        <th>Gmail</th>
-        <th>Total Users</th>
+        <th>Total Invites</th>
         <th>Active (24h)</th>
         <th>Offline</th>
         <th>Fake</th>
@@ -33,131 +54,141 @@ button{padding:5px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;
         <th>Details</th>
       </tr>
     </thead>
-    <tbody id="tBody">
-      <tr><td colspan="10">Loading…</td></tr>
+    <tbody id="tbody">
+      <tr><td colspan="9">Loading…</td></tr>
     </tbody>
   </table>
 </div>
 
-<!-- User Details Modal -->
-<div id="detailsModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);overflow:auto;">
-  <div style="background:#fff;margin:50px auto;padding:20px;border-radius:10px;max-width:800px;">
-    <h3 id="detailsTitle">Details</h3>
-    <table id="detailsTable" style="width:100%;border-collapse:collapse;">
+<!-- DETAILS MODAL -->
+<div id="detailsModal">
+  <div id="detailsContent">
+    <span id="closeModal">X</span>
+    <h3>Affiliate Details</h3>
+    <table id="detailsTable">
       <thead>
         <tr><th>Name</th><th>Email</th><th>Country</th><th>IP</th><th>Active</th></tr>
       </thead>
-      <tbody></tbody>
+      <tbody id="detailsBody"></tbody>
     </table>
-    <button onclick="document.getElementById('detailsModal').style.display='none'">Close</button>
   </div>
 </div>
 
 <script type="module">
-  // ----- PASSWORD PROTECTION -----
-  const password = prompt("Enter Admin Password:");
-  if(password !== "nadeem"){
-    alert("Wrong password! Access denied.");
-    document.body.innerHTML="<h2 style='text-align:center;margin-top:50px;color:red;'>Access Denied</h2>";
-    throw new Error("Access denied");
-  }
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-  // ----- FIREBASE -----
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-  import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
+  authDomain: "adwatchrewardsapp.firebaseapp.com",
+  projectId: "adwatchrewardsapp",
+  storageBucket: "adwatchrewardsapp.firebasestorage.app",
+  messagingSenderId: "782268735936",
+  appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
+  measurementId: "G-4NG2564HTK"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
-    authDomain: "adwatchrewardsapp.firebaseapp.com",
-    projectId: "adwatchrewardsapp",
-    storageBucket: "adwatchrewardsapp.firebasestorage.app",
-    messagingSenderId: "782268735936",
-    appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
-    measurementId: "G-4NG2564HTK"
-  };
+// LOGIN
+document.getElementById('loginBtn').onclick = ()=>{
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value.trim();
+  if(u==='admin' && p==='nadeem'){
+    document.getElementById('loginBox').style.display='none';
+    document.getElementById('dashboard').style.display='block';
+    loadLeaderboard();
+  }else alert('Invalid credentials!');
+};
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  document.getElementById("dashboard").style.display="block";
+// CPM Scores
+const countryScores = {
+  'Asia':130,'Europe':370,'Middle East':350,'USA':500,'Canada':500,'UK':500
+};
+function getCountryScore(country){ return countryScores[country]||10; }
 
-  const tBody = document.getElementById("tBody");
-  const detailsModal = document.getElementById("detailsModal");
-  const detailsTableBody = detailsModal.querySelector("tbody");
-  const detailsTitle = document.getElementById("detailsTitle");
+// LOAD LEADERBOARD
+async function loadLeaderboard(){
+  const snap = await getDocs(collection(db,'referrals'));
+  const affiliates = {};
+  const now = new Date();
 
-  async function loadDashboard(){
-    tBody.innerHTML="<tr><td colspan='10'>Loading…</td></tr>";
-    const usersSnap = await getDocs(collection(db,"users"));
-    const now = Date.now();
-    const DAY_24 = 24*60*60*1000;
-    let rows=[];
+  snap.forEach(doc=>{
+    const d = doc.data();
+    const name = d.referrer || 'unknown';
+    const country = d.country || '';
+    const ip = d.ip || '';
+    const ts = d.timestamp ? d.timestamp.toDate() : now;
 
-    usersSnap.forEach(docSnap=>{
-      const data=docSnap.data();
-      const invited=data.invitedUsers || [];
-      const total=invited.length;
-      const active=invited.filter(u=>now-u.timestamp<=DAY_24).length;
-      const offline=total-active;
-      const fake=invited.reduce((acc,u,i)=>acc + (invited.filter(x=>x.ip===u.ip).length>1?1:0),0);
+    if(!affiliates[name]) affiliates[name]={total:0,active:0,offline:0,fake:0,ips:{},users:[]};
+    affiliates[name].total++;
+    affiliates[name].users.push(d);
+    affiliates[name].ips[ip] = (affiliates[name].ips[ip]||0)+1;
 
-      const activePercent = total>0 ? Math.round(active/total*100) : 0;
+    const diffH = (now - ts)/36e5;
+    if(diffH<=24) affiliates[name].active++;
+    else affiliates[name].offline++;
+  });
 
-      // CPM Score
-      const score = invited.reduce((acc,u)=>{
-        if(u.country==="USA"||u.country==="CANADA"||u.country==="UK") return acc+500;
-        if(u.country==="Europe") return acc+370;
-        if(u.country==="MiddleEast") return acc+350;
-        if(u.country==="Asia") return acc+130;
-        return acc+10;
-      },0);
+  // Calculate fake users
+  Object.keys(affiliates).forEach(name=>{
+    let f=0;
+    Object.values(affiliates[name].ips).forEach(v=>{ if(v>1) f+=v-1; });
+    affiliates[name].fake=f;
+  });
 
-      rows.push({name:data.name||docSnap.id,email:data.email||"",total,active,offline,fake,activePercent,score,invited});
-    });
+  // Calculate Active % and Score
+  const leaderboard = [];
+  Object.keys(affiliates).forEach(name=>{
+    const a = affiliates[name];
+    const activePerc = Math.round((a.active/a.total)*100);
+    let score = 0;
+    a.users.forEach(u=>{ score += 10 + getCountryScore(u.country); });
+    leaderboard.push({...a,name,activePerc,score});
+  });
 
-    rows.sort((a,b)=>b.score-a.score);
+  // Sort by score
+  leaderboard.sort((a,b)=>b.score-a.score);
 
-    let html="";
-    rows.forEach((r,i)=>{
-      html+=`<tr>
-        <td>${i+1}</td>
-        <td>${r.name}</td>
-        <td>${r.email}</td>
-        <td>${r.total}</td>
-        <td>${r.active}</td>
-        <td>${r.offline}</td>
-        <td>${r.fake}</td>
-        <td>${r.activePercent}%</td>
-        <td>${r.score}</td>
-        <td><button onclick='showDetails(${i})'>Details</button></td>
-      </tr>`;
-    });
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML='';
+  leaderboard.forEach((a,i)=>{
+    const rankClass = i===0?'rank1':i===1?'rank2':i===2?'rank3':'';
+    const row = document.createElement('tr');
+    row.innerHTML=`
+      <td class="${rankClass}">${i+1}</td>
+      <td>${a.name}</td>
+      <td>${a.total}</td>
+      <td>${a.active}</td>
+      <td>${a.offline}</td>
+      <td>${a.fake}</td>
+      <td>${a.activePerc}%</td>
+      <td>${a.score}</td>
+      <td><button class="details-btn" data-name="${a.name}">Details</button></td>
+    `;
+    tbody.appendChild(row);
+  });
 
-    tBody.innerHTML=html;
+  // Details Modal
+  document.querySelectorAll('.details-btn').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const name = btn.getAttribute('data-name');
+      const detailsBody = document.getElementById('detailsBody');
+      detailsBody.innerHTML='';
+      const d = affiliates[name].users;
+      d.forEach(u=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML=`<td>${name}</td><td>${u.email||'N/A'}</td><td>${u.country}</td><td>${u.ip}</td><td>${u.active?'Yes':'No'}</td>`;
+        detailsBody.appendChild(tr);
+      });
+      document.getElementById('detailsModal').style.display='flex';
+    };
+  });
 
-    // store rows globally
-    window.dashboardRows=rows;
-  }
+  document.getElementById('closeModal').onclick = ()=>{ document.getElementById('detailsModal').style.display='none'; };
+}
 
-  function showDetails(index){
-    const user=window.dashboardRows[index];
-    detailsTitle.innerText="Details for "+user.name;
-    let html="";
-    user.invited.forEach(u=>{
-      const active=Date.now()-u.timestamp<=24*60*60*1000?"Yes":"No";
-      html+=`<tr>
-        <td>${user.name}</td>
-        <td>${u.email||"---"}</td>
-        <td>${u.country||"---"}</td>
-        <td>${u.ip||"---"}</td>
-        <td>${active}</td>
-      </tr>`;
-    });
-    detailsTableBody.innerHTML=html;
-    detailsModal.style.display="block";
-  }
-
-  loadDashboard();
-  setInterval(loadDashboard,10000);
+// Auto refresh every 30 seconds
+setInterval(()=>{ if(document.getElementById('dashboard').style.display==='block') loadLeaderboard(); },30000);
 </script>
-</body>
-</html>
