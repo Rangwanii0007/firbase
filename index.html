@@ -2753,5 +2753,51 @@
             }, 1000);
         });
     </script>
+
+
+    //TREACKER SYSTEM
+<div style="max-width:500px;margin:20px auto;padding:20px;border:1px solid #ddd;border-radius:10px;">
+  <h2>Referral Leaderboard</h2>
+  <ul id="leaderboard"><li>Loading...</li></ul>
+</div>
+
+<script type="module">
+  import { getFirestore, doc, setDoc, increment, collection, getDocs } 
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+  const app = getApp();
+  const db = getFirestore(app);
+
+  const friends = ["nadeem","ikram","shahid","waheed","naseer"];
+
+  // 1. Track ?ref=
+  const urlParams = new URLSearchParams(window.location.search);
+  const refName = urlParams.get("ref");
+  if (refName && friends.includes(refName.toLowerCase())) {
+    const refDoc = doc(db, "traffic", refName.toLowerCase());
+    setDoc(refDoc, { clicks: increment(1) }, { merge: true });
+    console.log("Logged visit for:", refName);
+  }
+
+  // 2. Show leaderboard
+  async function loadLeaderboard() {
+    const snap = await getDocs(collection(db, "traffic"));
+    const counts = {};
+    friends.forEach(f => counts[f] = 0);
+    snap.forEach(d => counts[d.id] = d.data().clicks || 0);
+
+    const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+    const list = document.getElementById("leaderboard");
+    list.innerHTML = "";
+    sorted.forEach(([name, clicks]) => {
+      const li = document.createElement("li");
+      li.textContent = `${name.toUpperCase()} → ${clicks} visits`;
+      list.appendChild(li);
+    });
+  }
+  loadLeaderboard();
+</script>
+
 </body>
 </html>
