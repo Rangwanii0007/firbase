@@ -1,113 +1,154 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Referral Engagement Dashboard</title>
+  <meta charset="utf-8"/>
+  <title>Admin — Referral Engagement Dashboard</title>
+  <meta name="robots" content="noindex">
   <style>
-    body { font-family: Arial, sans-serif; background:#f5f5f5; }
-    h2 { text-align:center; margin:20px; }
-    table { width:95%; margin:auto; border-collapse:collapse; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
-    th, td { padding:10px; border:1px solid #ddd; text-align:center; }
-    th { background:#333; color:#fff; }
-    tr:nth-child(even){ background:#f9f9f9; }
+    body{font-family:Arial,Helvetica,sans-serif;background:#f6f7fb;margin:0;padding:24px}
+    .wrap{max-width:1100px;margin:0 auto}
+    h1{margin:0 0 12px}
+    .bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    input,button{padding:8px 10px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 6px 18px rgba(20,20,40,.06)}
+    th,td{padding:10px;border-bottom:1px solid #eee;text-align:center}
+    th{background:#f0f6ff}
+    tr:last-child td{border-bottom:0}
+    .small{font-size:12px;color:#666}
   </style>
 </head>
 <body>
-  <h2>Referral Engagement Dashboard</h2>
-  <table id="dashboardTable">
+<div class="wrap">
+  <h1>Referral Engagement Dashboard</h1>
+  <div class="bar small">
+    <span><b>Active</b> = last visit in past 24h. <b>Fake</b> = extra accounts from the same IP.</span>
+    <span style="margin-left:auto">Auto-refresh <input type="checkbox" id="auto"> every 10s</span>
+    <button id="refresh">Refresh</button>
+    <button id="export">Export CSV</button>
+  </div>
+
+  <table>
     <thead>
       <tr>
         <th>Name</th>
-        <th>Gmail</th>
-        <th>Total Users</th>
+        <th>USERS</th>
         <th>Active Users (24h)</th>
         <th>Offline Users</th>
-        <th>Fake Users (Same IP)</th>
+        <th>Fake Users (same IP)</th>
       </tr>
     </thead>
-    <tbody>
-      <tr><td colspan="6">Fetching data…</td></tr>
+    <tbody id="rows">
+      <tr><td colspan="5">Loading…</td></tr>
     </tbody>
   </table>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"></script>
+  <p class="small" style="margin-top:8px">
+    Source: Firestore <code>users</code> (1 doc per browser/device).<br>
+    Tip: Share links like <code>?ref=NADEEM</code>, <code>?ref=IKRAM</code>, etc.
+  </p>
+</div>
 
-  <script>
-    // 🔹 Your Firebase Config
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-      projectId: "YOUR_PROJECT",
-      storageBucket: "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "SENDER_ID",
-      appId: "APP_ID"
-    };
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+  import { getFirestore, collection, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  // same config
+  const firebaseConfig = {
+    apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
+    authDomain: "adwatchrewardsapp.firebaseapp.com",
+    projectId: "adwatchrewardsapp",
+    storageBucket: "adwatchrewardsapp.firebasestorage.app",
+    messagingSenderId: "782268735936",
+    appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
+    measurementId: "G-4NG2564HTK"
+  };
 
-    const tableBody = document.querySelector("#dashboardTable tbody");
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-    function loadDashboard() {
-      db.ref("users").once("value").then(snapshot => {
-        const users = snapshot.val();
-        if (!users) {
-          tableBody.innerHTML = "<tr><td colspan='6'>No users found</td></tr>";
-          return;
+  const rows = document.getElementById("rows");
+  const btn = document.getElementById("refresh");
+  const exp = document.getElementById("export");
+  const auto = document.getElementById("auto");
+  let timer = null;
+
+  function isActiveIn24h(lastActiveTs) {
+    if (!lastActiveTs) return false;
+    const d = lastActiveTs instanceof Timestamp ? lastActiveTs.toDate() : new Date(lastActiveTs);
+    return (Date.now() - d.getTime()) < 24*60*60*1000;
+  }
+
+  async function load() {
+    rows.innerHTML = "<tr><td colspan='5'>Loading…</td></tr>";
+
+    try {
+      const snap = await getDocs(collection(db, "users"));
+      if (snap.empty) {
+        rows.innerHTML = "<tr><td colspan='5'>No users found. Visit your site with ?ref=NAME to create data.</td></tr>";
+        return;
+      }
+
+      const byRef = new Map(); // referredBy -> { total, active, offline, ipCounts: Map }
+
+      snap.forEach(docSnap => {
+        const u = docSnap.data();
+        const nameRaw = (u.referredBy || "direct").toString();
+        const name = nameRaw.trim();
+        const ip = (u.ip || "unknown").toString();
+        const active = isActiveIn24h(u.lastActive);
+
+        if (!byRef.has(name)) {
+          byRef.set(name, { total:0, active:0, offline:0, ipCounts: new Map() });
         }
+        const bucket = byRef.get(name);
+        bucket.total += 1;
+        if (active) bucket.active += 1; else bucket.offline += 1;
 
-        let rows = "";
-
-        Object.keys(users).forEach(uid => {
-          const user = users[uid];
-          const name = user.name || "Unknown";
-          const gmail = user.gmail || "N/A";
-          const referrals = user.referrals ? Object.values(user.referrals) : [];
-
-          let totalUsers = referrals.length;
-          let active = 0, offline = 0, fake = 0;
-          let ipMap = {};
-
-          referrals.forEach(r => {
-            if (!r) return;
-            const lastActive = r.lastActive || 0;
-            const ip = r.ip || "unknown";
-
-            // Count active vs offline
-            if (Date.now() - lastActive < 24 * 60 * 60 * 1000) {
-              active++;
-            } else {
-              offline++;
-            }
-
-            // Detect fake (duplicate IPs)
-            if (ipMap[ip]) {
-              fake++;
-            } else {
-              ipMap[ip] = true;
-            }
-          });
-
-          rows += `
-            <tr>
-              <td>${name}</td>
-              <td>${gmail}</td>
-              <td>${totalUsers}</td>
-              <td>${active}</td>
-              <td>${offline}</td>
-              <td>${fake}</td>
-            </tr>`;
-        });
-
-        tableBody.innerHTML = rows;
+        const count = (bucket.ipCounts.get(ip) || 0) + 1;
+        bucket.ipCounts.set(ip, count);
       });
-    }
 
-    loadDashboard();
-  </script>
+      const arr = Array.from(byRef.entries()).sort((a,b)=> b[1].total - a[1].total);
+      let html = "";
+      arr.forEach(([name, stats]) => {
+        const fake = Array.from(stats.ipCounts.values()).reduce((sum,n)=> sum + (n>1 ? (n-1) : 0), 0);
+        html += `<tr>
+          <td>${name.toUpperCase()}</td>
+          <td>${stats.total}</td>
+          <td>${stats.active}</td>
+          <td>${stats.offline}</td>
+          <td>${fake}</td>
+        </tr>`;
+      });
+      rows.innerHTML = html || "<tr><td colspan='5'>No data to show.</td></tr>";
+    } catch (e) {
+      console.error(e);
+      rows.innerHTML = `<tr><td colspan="5">Error loading. Check Console.</td></tr>`;
+    }
+  }
+
+  btn.addEventListener("click", load);
+  auto.addEventListener("change", ()=>{
+    if (auto.checked) timer = setInterval(load, 10000);
+    else { clearInterval(timer); timer = null; }
+  });
+
+  exp.addEventListener("click", ()=>{
+    let csv = "Name,USERS,Active Users,Offline Users,Fake Users\n";
+    const trs = rows.querySelectorAll("tr");
+    trs.forEach(tr=>{
+      const tds = tr.querySelectorAll("td");
+      if (tds.length === 5) {
+        csv += `${tds[0].textContent},${tds[1].textContent},${tds[2].textContent},${tds[3].textContent},${tds[4].textContent}\n`;
+      }
+    });
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "referral_dashboard.csv"; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  load();
+</script>
 </body>
 </html>
