@@ -2756,7 +2756,7 @@
 //TREAKCER
 
 
-  <!-- 🔽 Referral & Engagement tracker (paste right before </body>) -->
+ <!-- Referral & Engagement tracker (paste just before </body>) -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
   import {
@@ -2764,7 +2764,7 @@
     serverTimestamp, collection, addDoc
   } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-  // ✅ Your Firebase config
+  // --- YOUR Firebase config (unchanged) ---
   const firebaseConfig = {
     apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
     authDomain: "adwatchrewardsapp.firebaseapp.com",
@@ -2774,7 +2774,6 @@
     appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
     measurementId: "G-4NG2564HTK"
   };
-
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
@@ -2789,16 +2788,7 @@
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
-  async function getIP() {
-    try {
-      const r = await fetch("https://api.ipify.org?format=json", { cache: "no-store" });
-      const j = await r.json();
-      return j.ip || "unknown";
-    } catch(e) {
-      console.warn("IP fetch failed", e);
-      return "unknown";
-    }
-  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
   // --- unique client id per browser/device ---
   let clientId = localStorage.getItem("clientId");
@@ -2807,23 +2797,47 @@
     localStorage.setItem("clientId", clientId);
   }
 
-  // --- referral name from ?ref= (locked on first creation) ---
+  // --- read URL params ---
   const params = new URLSearchParams(location.search);
-  const refParam = params.get("ref");
+  const refParam  = params.get("ref");
+  const emailParam = params.get("email");
   const referredByIncoming = refParam ? String(refParam).trim() : "direct";
+  const emailIncoming = emailParam && emailRegex.test(emailParam) ? String(emailParam).trim() : null;
+
+  // --- IP + Country ---
+  async function getIpAndCountry() {
+    try {
+      // get IP
+      const ipRes = await fetch("https://api.ipify.org?format=json", { cache: "no-store" });
+      const ipJson = await ipRes.json();
+      const ip = ipJson.ip || "unknown";
+
+      // country from ipwho.is (HTTPS & CORS-friendly)
+      let country = "Unknown";
+      try {
+        const cRes = await fetch(`https://ipwho.is/${ip}`);
+        const cJson = await cRes.json();
+        if (cJson && cJson.success && cJson.country) country = cJson.country;
+      } catch {}
+      return { ip, country };
+    } catch {
+      return { ip: "unknown", country: "Unknown" };
+    }
+  }
 
   (async () => {
-    const ip = await getIP();
+    const { ip, country } = await getIpAndCountry();
     const userRef = doc(db, "users", clientId);
     const snap = await getDoc(userRef);
     const today = todayYMD();
 
     try {
       if (!snap.exists()) {
-        // first time visitor on this browser
+        // first time visitor on this browser/device
         await setDoc(userRef, {
           referredBy: referredByIncoming,    // lock on first write
-          ip: ip,
+          email: emailIncoming || null,      // optional
+          ip, country,
           signupAt: serverTimestamp(),
           lastActive: serverTimestamp(),
           lastActiveYMD: today,
@@ -2837,24 +2851,28 @@
           lastActiveYMD: today,
           visits: (data.visits || 0) + 1,
           referredBy: data.referredBy || referredByIncoming,
-          ip: data.ip || ip
+          email: data.email || emailIncoming || null,
+          ip: data.ip || ip,
+          country: data.country || country
         });
       }
 
-      // optional: append visit log (for future charts)
+      // optional per-visit log (for future reports)
       await addDoc(collection(db, "visitLogs"), {
         clientId,
         referredBy: referredByIncoming,
-        ip,
-        when: serverTimestamp(),
-        ymd: today
+        email: emailIncoming || null,
+        ip, country,
+        ymd: today,
+        when: serverTimestamp()
       });
     } catch (err) {
       console.error("Firestore write failed:", err);
     }
   })();
 </script>
-<!-- 🔼 End tracker -->
+<!-- /tracker -->
+
 
 </body>
 </html>
