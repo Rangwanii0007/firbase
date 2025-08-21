@@ -2,21 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Referral Admin Dashboard</title>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Referral Engagement Dashboard</title>
   <style>
-    body { font-family: Arial, sans-serif; background:#f5f5f5; padding:20px; }
-    table { width:100%; border-collapse:collapse; background:#fff; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
-    th, td { padding:10px; text-align:center; border:1px solid #ddd; }
-    th { background:#222; color:#fff; }
-    tr:nth-child(even){background:#f9f9f9;}
+    body { font-family: Arial, sans-serif; background:#f5f5f5; }
+    h2 { text-align:center; margin:20px; }
+    table { width:95%; margin:auto; border-collapse:collapse; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+    th, td { padding:10px; border:1px solid #ddd; text-align:center; }
+    th { background:#333; color:#fff; }
+    tr:nth-child(even){ background:#f9f9f9; }
   </style>
 </head>
 <body>
   <h2>Referral Engagement Dashboard</h2>
-  <table>
+  <table id="dashboardTable">
     <thead>
       <tr>
         <th>Name</th>
@@ -27,85 +26,88 @@
         <th>Fake Users (Same IP)</th>
       </tr>
     </thead>
-    <tbody id="stats-body">
-      <tr><td colspan="6">Loading…</td></tr>
+    <tbody>
+      <tr><td colspan="6">Fetching data…</td></tr>
     </tbody>
   </table>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js"></script>
 
+  <script>
+    // 🔹 Your Firebase Config
     const firebaseConfig = {
-  apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
-  authDomain: "adwatchrewardsapp.firebaseapp.com",
-  projectId: "adwatchrewardsapp",
-  storageBucket: "adwatchrewardsapp.firebasestorage.app",
-  messagingSenderId: "782268735936",
-  appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
-  measurementId: "G-4NG2564HTK"
-};
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+      projectId: "YOUR_PROJECT",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "SENDER_ID",
+      appId: "APP_ID"
+    };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    async function loadStats() {
-      const tbody = document.getElementById("stats-body");
-      tbody.innerHTML = "<tr><td colspan='6'>Fetching data…</td></tr>";
+    const tableBody = document.querySelector("#dashboardTable tbody");
 
-      const usersSnap = await getDocs(collection(db, "users"));
-      if (usersSnap.empty) {
-        tbody.innerHTML = "<tr><td colspan='6'>No data found</td></tr>";
-        return;
-      }
-
-      const inviterStats = {};
-
-      usersSnap.forEach(doc => {
-        const user = doc.data();
-        const inviter = user.inviter || "Unknown";
-        const gmail = user.email || "N/A";
-        const lastSeen = user.lastSeen ? new Date(user.lastSeen.toDate ? user.lastSeen.toDate() : user.lastSeen) : null;
-        const ip = user.ip || "0.0.0.0";
-
-        if (!inviterStats[inviter]) {
-          inviterStats[inviter] = { gmail, total:0, active:0, offline:0, fake:0, ips:{} };
+    function loadDashboard() {
+      db.ref("users").once("value").then(snapshot => {
+        const users = snapshot.val();
+        if (!users) {
+          tableBody.innerHTML = "<tr><td colspan='6'>No users found</td></tr>";
+          return;
         }
 
-        inviterStats[inviter].total++;
+        let rows = "";
 
-        if (lastSeen) {
-          const diff = (Date.now() - lastSeen.getTime()) / (1000*60*60); // hours
-          if (diff <= 24) inviterStats[inviter].active++;
-          else inviterStats[inviter].offline++;
-        } else {
-          inviterStats[inviter].offline++;
-        }
+        Object.keys(users).forEach(uid => {
+          const user = users[uid];
+          const name = user.name || "Unknown";
+          const gmail = user.gmail || "N/A";
+          const referrals = user.referrals ? Object.values(user.referrals) : [];
 
-        if (inviterStats[inviter].ips[ip]) {
-          inviterStats[inviter].fake++;
-        } else {
-          inviterStats[inviter].ips[ip] = true;
-        }
+          let totalUsers = referrals.length;
+          let active = 0, offline = 0, fake = 0;
+          let ipMap = {};
+
+          referrals.forEach(r => {
+            if (!r) return;
+            const lastActive = r.lastActive || 0;
+            const ip = r.ip || "unknown";
+
+            // Count active vs offline
+            if (Date.now() - lastActive < 24 * 60 * 60 * 1000) {
+              active++;
+            } else {
+              offline++;
+            }
+
+            // Detect fake (duplicate IPs)
+            if (ipMap[ip]) {
+              fake++;
+            } else {
+              ipMap[ip] = true;
+            }
+          });
+
+          rows += `
+            <tr>
+              <td>${name}</td>
+              <td>${gmail}</td>
+              <td>${totalUsers}</td>
+              <td>${active}</td>
+              <td>${offline}</td>
+              <td>${fake}</td>
+            </tr>`;
+        });
+
+        tableBody.innerHTML = rows;
       });
-
-      tbody.innerHTML = "";
-      for (let name in inviterStats) {
-        const s = inviterStats[name];
-        tbody.innerHTML += `
-          <tr>
-            <td>${name}</td>
-            <td>${s.gmail}</td>
-            <td>${s.total}</td>
-            <td>${s.active}</td>
-            <td>${s.offline}</td>
-            <td>${s.fake}</td>
-          </tr>
-        `;
-      }
     }
 
-    loadStats();
+    loadDashboard();
   </script>
 </body>
 </html>
