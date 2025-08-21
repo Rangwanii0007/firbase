@@ -1,69 +1,42 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Referral Engagement Dashboard</title>
+  <meta charset="utf-8"/>
+  <title>Admin — Referral Engagement Dashboard</title>
+  <meta name="robots" content="noindex">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
-      padding: 20px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-      background: white;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    th, td {
-      padding: 12px;
-      border: 1px solid #ddd;
-      text-align: center;
-    }
-    th {
-      background: #007bff;
-      color: white;
-    }
-    button {
-      background: #28a745;
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #218838;
-    }
-    /* Modal */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.6);
-      justify-content: center;
-      align-items: center;
-    }
-    .modal-content {
-      background: #fff;
-      padding: 20px;
-      border-radius: 10px;
-      width: 500px;
-      max-width: 90%;
-    }
-    .close {
-      float: right;
-      cursor: pointer;
-      font-size: 20px;
-      color: red;
-    }
+    body{font-family:Arial,Helvetica,sans-serif;background:#f6f7fb;margin:0;padding:24px}
+    .wrap{max-width:1200px;margin:0 auto}
+    h1{margin:0 0 12px}
+    .bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    input,button{padding:8px 10px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 6px 18px rgba(20,20,40,.06)}
+    th,td{padding:10px;border-bottom:1px solid #eee;text-align:center}
+    th{background:#2c7be5;color:#fff}
+    tr:last-child td{border-bottom:0}
+    .small{font-size:12px;color:#666}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff}
+    /* modal */
+    .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:16px}
+    .modal .card{background:#fff;max-width:820px;width:100%;border-radius:12px;box-shadow:0 10px 30px rgba(20,20,40,.25);padding:18px}
+    .modal h3{margin:0 0 6px}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .list{max-height:260px;overflow:auto;border:1px solid #eee;border-radius:8px}
+    .list table{box-shadow:none;border-radius:0}
+    .close{float:right;font-size:22px;color:#e00;cursor:pointer}
   </style>
 </head>
 <body>
-  <h2>Referral Engagement Dashboard</h2>
-  <table id="adminTable">
+<div class="wrap">
+  <h1>Referral Engagement Dashboard</h1>
+  <div class="bar small">
+    <span><b>Active</b> = last visit in past 24h. <b>Fake</b> = extra accounts on the same IP.</span>
+    <span style="margin-left:auto">Auto-refresh <input type="checkbox" id="auto"> every 10s</span>
+    <button id="refresh">Refresh</button>
+    <button id="export">Export CSV</button>
+  </div>
+
+  <table>
     <thead>
       <tr>
         <th>Name</th>
@@ -72,72 +45,229 @@
         <th>Active Users (24h)</th>
         <th>Offline Users</th>
         <th>Fake Users (Same IP)</th>
+        <th>Active %</th>
         <th>Details</th>
       </tr>
     </thead>
-    <tbody>
-      <tr><td colspan="7">Fetching data…</td></tr>
+    <tbody id="rows">
+      <tr><td colspan="8">Loading…</td></tr>
     </tbody>
   </table>
 
-  <!-- Modal -->
-  <div id="detailsModal" class="modal">
-    <div class="modal-content">
-      <span class="close" onclick="closeModal()">&times;</span>
-      <h3>User Details</h3>
-      <p><strong>Name:</strong> <span id="detailName"></span></p>
-      <p><strong>Email:</strong> <span id="detailEmail"></span></p>
-      <p><strong>Country/IP:</strong> <span id="detailIP"></span></p>
-      <p><strong>Active Users:</strong> <span id="detailActive"></span></p>
-      <p><strong>Offline Users:</strong> <span id="detailOffline"></span></p>
-      <p><strong>Fake Users:</strong> <span id="detailFake"></span></p>
+  <p class="small" style="margin-top:8px">
+    Source: Firestore <code>users</code> (1 doc per browser/device).  
+    Tip: Share links like <code>?ref=NADEEM</code>, <code>?ref=IKRAM</code>.  
+    If you include <code>&email=</code> in links or save via form, emails will appear in Details.
+  </p>
+</div>
+
+<!-- Details Modal -->
+<div id="modal" class="modal" role="dialog" aria-modal="true">
+  <div class="card">
+    <span class="close" id="closeBtn">&times;</span>
+    <h3 id="mTitle">Details</h3>
+    <div class="grid" style="margin:10px 0 12px">
+      <div><b>Total:</b> <span id="mTotal" class="pill">0</span></div>
+      <div><b>Active (24h):</b> <span id="mActive" class="pill">0</span></div>
+      <div><b>Offline:</b> <span id="mOffline" class="pill">0</span></div>
+      <div><b>Fake (same IP):</b> <span id="mFake" class="pill">0</span></div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <h4 style="margin:6px 0">Countries</h4>
+        <div class="list">
+          <table style="width:100%">
+            <thead><tr><th>Country</th><th>Count</th></tr></thead>
+            <tbody id="mCountries"><tr><td colspan="2">—</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <h4 style="margin:6px 0">Invited Emails</h4>
+        <div class="list">
+          <table style="width:100%">
+            <thead><tr><th>Email</th><th>Status</th></tr></thead>
+            <tbody id="mEmails"><tr><td colspan="2">—</td></tr></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
+</div>
 
-  <script>
-    const sampleData = [
-      { name: "Nadeem", email: "nadeem@gmail.com", total: 10, active: 7, offline: 2, fake: 1, ip: "103.24.55.12 (Pakistan)" },
-      { name: "Ikram", email: "ikram@gmail.com", total: 6, active: 4, offline: 1, fake: 1, ip: "41.24.87.91 (USA)" },
-      { name: "Nida", email: "nida@gmail.com", total: 5, active: 3, offline: 2, fake: 0, ip: "67.24.13.77 (UK)" }
-    ];
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+  import { getFirestore, collection, onSnapshot, Timestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-    const tableBody = document.querySelector("#adminTable tbody");
+  // --- YOUR config (same as tracker) ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
+    authDomain: "adwatchrewardsapp.firebaseapp.com",
+    projectId: "adwatchrewardsapp",
+    storageBucket: "adwatchrewardsapp.firebasestorage.app",
+    messagingSenderId: "782268735936",
+    appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
+    measurementId: "G-4NG2564HTK"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-    function loadData() {
-      tableBody.innerHTML = "";
-      sampleData.forEach(user => {
-        let row = `<tr>
-          <td>${user.name}</td>
-          <td>${user.email}</td>
-          <td>${user.total}</td>
-          <td>${user.active}</td>
-          <td>${user.offline}</td>
-          <td>${user.fake}</td>
-          <td><button onclick="showDetails('${user.name}')">Details</button></td>
-        </tr>`;
-        tableBody.innerHTML += row;
+  const rows = document.getElementById("rows");
+  const btn = document.getElementById("refresh");
+  const exp = document.getElementById("export");
+  const auto = document.getElementById("auto");
+  const modal = document.getElementById("modal");
+  const closeBtn = document.getElementById("closeBtn");
+
+  let timer = null;
+  let allUsers = []; // keep the current snapshot in memory
+
+  function isActiveIn24h(lastActiveTs) {
+    if (!lastActiveTs) return false;
+    const d = lastActiveTs instanceof Timestamp ? lastActiveTs.toDate() : new Date(lastActiveTs);
+    return (Date.now() - d.getTime()) < 24*60*60*1000;
+  }
+
+  function aggregate(users) {
+    // Aggregate per REFERRER (case-insensitive)
+    const map = new Map(); // KEY=referrer (upper) -> stats object
+    users.forEach(u => {
+      const raw = (u.referredBy || "direct").toString();
+      const key = raw.trim().toUpperCase();
+      const ip = (u.ip || "unknown").toString();
+      const active = isActiveIn24h(u.lastActive);
+
+      if (!map.has(key)) map.set(key, {
+        name: key,
+        gmail: u.inviterEmail || "", // if you later store inviter’s email; else keep blank
+        total: 0, active: 0, offline: 0,
+        ipCounts: new Map(),
       });
+
+      const b = map.get(key);
+      b.total += 1;
+      if (active) b.active += 1; else b.offline += 1;
+
+      b.ipCounts.set(ip, (b.ipCounts.get(ip) || 0) + 1);
+    });
+    return Array.from(map.values()).sort((a,b)=> b.total - a.total);
+  }
+
+  function renderTable(stats) {
+    if (!stats.length) {
+      rows.innerHTML = "<tr><td colspan='8'>No users found yet. Visit your site with ?ref=NAME to create data.</td></tr>";
+      return;
     }
+    let html = "";
+    stats.forEach(s => {
+      const fake = Array.from(s.ipCounts.values()).reduce((sum,n)=> sum + Math.max(0, n-1), 0);
+      const activePct = s.total ? ((s.active / s.total) * 100).toFixed(1) + "%" : "0%";
+      html += `<tr>
+        <td>${s.name}</td>
+        <td>${s.gmail || "—"}</td>
+        <td>${s.total}</td>
+        <td>${s.active}</td>
+        <td>${s.offline}</td>
+        <td>${fake}</td>
+        <td>${activePct}</td>
+        <td><button data-name="${s.name}" class="detailBtn">Details</button></td>
+      </tr>`;
+    });
+    rows.innerHTML = html;
 
-    function showDetails(userName) {
-      const user = sampleData.find(u => u.name === userName);
-      if (user) {
-        document.getElementById("detailName").textContent = user.name;
-        document.getElementById("detailEmail").textContent = user.email;
-        document.getElementById("detailIP").textContent = user.ip;
-        document.getElementById("detailActive").textContent = user.active;
-        document.getElementById("detailOffline").textContent = user.offline;
-        document.getElementById("detailFake").textContent = user.fake;
+    // bind detail buttons
+    document.querySelectorAll(".detailBtn").forEach(btn => {
+      btn.addEventListener("click", () => openDetails(btn.getAttribute("data-name")));
+    });
+  }
 
-        document.getElementById("detailsModal").style.display = "flex";
+  // Real-time listener (updates instantly)
+  const unsub = onSnapshot(collection(db, "users"), (snap) => {
+    allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderTable(aggregate(allUsers));
+  }, (err) => {
+    console.error(err);
+    rows.innerHTML = `<tr><td colspan="8">Error loading users. Check Console.</td></tr>`;
+  });
+
+  btn.addEventListener("click", () => renderTable(aggregate(allUsers)));
+
+  auto.addEventListener("change", ()=>{
+    if (auto.checked) timer = setInterval(()=> renderTable(aggregate(allUsers)), 10000);
+    else { clearInterval(timer); timer = null; }
+  });
+
+  exp.addEventListener("click", ()=>{
+    let csv = "Name,Gmail,Total Users,Active Users,Offline Users,Fake Users,Active %\n";
+    document.querySelectorAll("tbody tr").forEach(tr=>{
+      const tds = tr.querySelectorAll("td");
+      if (tds.length === 8) {
+        csv += `${tds[0].textContent},${tds[1].textContent},${tds[2].textContent},${tds[3].textContent},${tds[4].textContent},${tds[5].textContent},${tds[6].textContent}\n`;
       }
+    });
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "referral_dashboard.csv"; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // ---------- DETAILS MODAL ----------
+  function openDetails(refNameUpper) {
+    const list = allUsers.filter(u => String(u.referredBy || "direct").trim().toUpperCase() === refNameUpper);
+
+    const total = list.length;
+    const active = list.filter(u => isActiveIn24h(u.lastActive)).length;
+    const offline = total - active;
+
+    const ipCounts = new Map();
+    const countryCounts = new Map();
+    const emails = [];
+
+    list.forEach(u => {
+      const ip = (u.ip || "unknown").toString();
+      ipCounts.set(ip, (ipCounts.get(ip) || 0) + 1);
+
+      const country = (u.country || "Unknown").toString();
+      countryCounts.set(country, (countryCounts.get(country) || 0) + 1);
+
+      if (u.email) emails.push({ email: u.email, active: isActiveIn24h(u.lastActive) });
+    });
+
+    const fake = Array.from(ipCounts.values()).reduce((sum,n)=> sum + Math.max(0, n-1), 0);
+
+    // header
+    document.getElementById("mTitle").textContent = `Details — ${refNameUpper}`;
+    document.getElementById("mTotal").textContent = total;
+    document.getElementById("mActive").textContent = active;
+    document.getElementById("mOffline").textContent = offline;
+    document.getElementById("mFake").textContent = fake;
+
+    // countries table
+    const mCountries = document.getElementById("mCountries");
+    if (countryCounts.size === 0) {
+      mCountries.innerHTML = `<tr><td colspan="2">No country data.</td></tr>`;
+    } else {
+      mCountries.innerHTML = Array.from(countryCounts.entries())
+        .sort((a,b)=> b[1]-a[1])
+        .map(([c,n])=> `<tr><td>${c}</td><td>${n}</td></tr>`).join("");
     }
 
-    function closeModal() {
-      document.getElementById("detailsModal").style.display = "none";
+    // emails table
+    const mEmails = document.getElementById("mEmails");
+    if (emails.length === 0) {
+      mEmails.innerHTML = `<tr><td colspan="2">No emails recorded.</td></tr>`;
+    } else {
+      mEmails.innerHTML = emails
+        .map(e => `<tr><td>${e.email}</td><td>${e.active ? "Active" : "Offline"}</td></tr>`)
+        .join("");
     }
 
-    loadData();
-  </script>
+    modal.style.display = "flex";
+  }
+
+  closeBtn.addEventListener("click", ()=> modal.style.display = "none");
+  modal.addEventListener("click", (e)=> { if (e.target === modal) modal.style.display = "none"; });
+</script>
 </body>
 </html>
