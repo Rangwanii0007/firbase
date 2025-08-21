@@ -1,6 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- Firebase core -->
+<script type="module">
+  // Import SDKs from Firebase CDN
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+  // Your Firebase config (already given)
+  const firebaseConfig = {
+    apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
+    authDomain: "adwatchrewardsapp.firebaseapp.com",
+    projectId: "adwatchrewardsapp",
+    storageBucket: "adwatchrewardsapp.firebasestorage.app",
+    messagingSenderId: "782268735936",
+    appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
+    measurementId: "G-4NG2564HTK"
+  };
+
+  // Initialize Firebase + Firestore
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Test: Add data to Firestore
+  async function addMessage() {
+    await addDoc(collection(db, "messages"), {
+      text: "Hello from GitHub site!",
+      time: Date.now()
+    });
+    alert("Message added!");
+  }
+
+  // Test: Get all messages
+  async function getMessages() {
+    const querySnapshot = await getDocs(collection(db, "messages"));
+    let output = "";
+    querySnapshot.forEach((doc) => {
+      output += doc.data().text + "<br>";
+    });
+    document.getElementById("messages").innerHTML = output;
+  }
+
+  // Expose functions to buttons
+  window.addMessage = addMessage;
+  window.getMessages = getMessages;
+</script>
+//SDK 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ad watch Rewards</title>
@@ -2819,6 +2864,12 @@ if (refRaw) {
   }
 }
 </script>
+//SDK
+<h2>🔥 Firebase Test</h2>
+<button onclick="addMessage()">Add Message</button>
+<button onclick="getMessages()">Get Messages</button>
+
+<div id="messages"></div>
 
 </body>
 </html>
