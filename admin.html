@@ -2,103 +2,61 @@
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>Affiliate Leaderboard — Admin</title>
-  <meta name="robots" content="noindex">
+  <title>Affiliate Leaderboard (Admin)</title>
   <style>
-    :root{--blue:#2c7be5;--muted:#667088}
-    body{font-family:Inter,system-ui,Arial,Helvetica,sans-serif;background:#f4f6fb;margin:0;padding:24px}
-    .wrap{max-width:1200px;margin:0 auto}
-    h1{margin:0 0 12px;color:#0f172a}
-    .controls{display:flex;gap:8px;align-items:center;margin-bottom:12px}
-    button,input{padding:8px 10px;border-radius:8px;border:1px solid #dde6f0;background:#fff;cursor:pointer}
-    .table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 8px 30px rgba(18,40,80,.06)}
-    th,td{padding:10px;border-bottom:1px solid #f0f4f8;text-align:center;font-size:14px}
-    th{background:linear-gradient(180deg,#2c7be5,#1f61c7);color:white}
-    tr:hover td{background:#fbfdff}
-    .small{font-size:13px;color:var(--muted)}
-    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#eef6ff;color:#084298;font-weight:600}
-    .leaderboard{display:flex;gap:8px;margin:12px 0}
-    .card{background:#fff;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(20,20,40,0.04);flex:1}
-    .rank-badge{font-weight:700;background:linear-gradient(90deg,#ffd166,#ff9f1c);padding:6px 10px;border-radius:8px}
-    /* modal */
-    .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:16px;z-index:9999}
-    .modal .box{background:#fff;max-width:980px;width:100%;padding:18px;border-radius:10px;overflow:auto;max-height:80vh}
-    .close{float:right;color:#c0392b;font-weight:700;cursor:pointer}
-    table.smalltable{width:100%;border-collapse:collapse}
-    table.smalltable th, table.smalltable td{padding:8px;border:1px solid #eee;font-size:13px}
-    .progress{height:10px;background:#eef2ff;border-radius:999px;overflow:hidden}
-    .progress > i{display:block;height:100%;background:linear-gradient(90deg,#2c7be5,#00bcd4)}
+    body{font-family:Arial,sans-serif;background:#f5f7fb;padding:20px;}
+    .card{max-width:1000px;margin:0 auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 6px 18px rgba(20,20,40,0.06);}
+    table{width:100%;border-collapse:collapse;margin-top:12px;}
+    th,td{padding:10px;border:1px solid #eee;text-align:center;}
+    th{background:#f0f6ff;}
+    .controls{display:flex;gap:8px;align-items:center;margin-top:12px;}
+    button{padding:8px 10px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer;}
+    .small{font-size:13px;color:#666;}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Affiliate Leaderboard (Realtime)</h1>
-    <div class="controls">
-      <span class="small">Active = visited in last 24 hours · Fake = multiple accounts from same IP</span>
-      <span style="margin-left:auto" class="small">Auto updates via Firestore</span>
-      <button id="export">Export CSV</button>
-      <input id="search" placeholder="Search name..." />
-    </div>
 
-    <div class="leaderboard">
-      <div class="card" id="topSummary"><strong class="small">Top 3</strong><div id="top3" style="margin-top:8px"></div></div>
-      <div class="card"><strong class="small">Totals</strong><div id="totals" style="margin-top:8px"></div></div>
-      <div class="card"><strong class="small">Filters</strong>
-        <div style="margin-top:8px" class="small">Show top <select id="topN"><option>10</option><option>20</option><option>50</option></select></div>
-      </div>
-    </div>
+<div class="card" id="dashboard" style="display:none;">
+  <h2>Affiliate Leaderboard (Realtime)</h2>
+  <div class="small">Active = visited in last 24h · Fake = multiple accounts from same IP</div>
 
-    <table class="table" id="leaderTable" aria-live="polite">
-      <thead>
-        <tr>
-          <th>Rank</th>
-          <th>Name</th>
-          <th>Gmail</th>
-          <th>Total Invites</th>
-          <th>Active (24h)</th>
-          <th>Offline</th>
-          <th>Fake</th>
-          <th>Active %</th>
-          <th>Total Score</th>
-          <th>Details</th>
-        </tr>
-      </thead>
-      <tbody id="rows">
-        <tr><td colspan="10" class="small">Loading…</td></tr>
-      </tbody>
-    </table>
+  <div class="controls">
+    <button id="refreshBtn">Refresh Now</button>
+    <button id="exportCsv">Export CSV</button>
+    <label style="margin-left:auto" class="small">Auto-refresh: <input id="autoRefresh" type="checkbox"/></label>
   </div>
 
-  <!-- DETAILS MODAL -->
-  <div id="modal" class="modal" role="dialog" aria-hidden="true">
-    <div class="box">
-      <span class="close" id="closeBtn">&times;</span>
-      <h2 id="modalTitle">Details</h2>
-      <p class="small" id="modalSubtitle"></p>
-      <div style="display:flex;gap:12px;margin:12px 0">
-        <div style="flex:1">
-          <h4>Country Breakdown</h4>
-          <table class="smalltable" id="countryTable"><thead><tr><th>Country</th><th>Count</th><th>Score</th></tr></thead><tbody></tbody></table>
-        </div>
-        <div style="flex:1">
-          <h4>Invited Users</h4>
-          <table class="smalltable" id="inviteTable"><thead><tr><th>Email</th><th>Country</th><th>IP</th><th>Status</th><th>Score</th></tr></thead><tbody></tbody></table>
-        </div>
-      </div>
-      <div style="margin-top:12px">
-        <h4>Why this rank?</h4>
-        <p class="small" id="whyText"></p>
-      </div>
-    </div>
-  </div>
+  <table id="tbl">
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>Name</th>
+        <th>Total Invites</th>
+        <th>Active (24h)</th>
+        <th>Offline</th>
+        <th>Fake</th>
+        <th>Score</th>
+      </tr>
+    </thead>
+    <tbody id="tBody">
+      <tr><td colspan="7">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-  import {
-    getFirestore, collection, onSnapshot, query, where, getDocs, doc, getDoc
-  } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+  // ----- PASSWORD PROTECTION -----
+  let password = prompt("Enter admin password:");
+  if(password !== "nadeem"){
+    alert("Incorrect password. Access denied.");
+    document.body.innerHTML = "<h2 style='text-align:center;margin-top:50px;color:red;'>Access Denied</h2>";
+    throw new Error("Access denied");
+  }
 
-  // ----------------- CONFIG (your project) -----------------
+  // ----- FIREBASE -----
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+  import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
   const firebaseConfig = {
     apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
     authDomain: "adwatchrewardsapp.firebaseapp.com",
@@ -108,224 +66,100 @@
     appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
     measurementId: "G-4NG2564HTK"
   };
-  // --------------------------------------------------------
+
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  document.getElementById("dashboard").style.display = "block";
 
-  // ---------- SCORING SETUP ----------
-  const baseInviteScore = 10;
-  const premiumCountries = new Set([
-    "United States","United Kingdom","Canada","Germany","France","Australia","Switzerland","Netherlands"
-  ]);
-  const europeSet = new Set(["Austria","Belgium","Denmark","Finland","Sweden","Norway","Ireland","Spain","Italy","Portugal","Poland","Greece","Czech Republic","Hungary","Romania","Bulgaria","Slovakia","Slovenia","Croatia","Estonia","Latvia","Lithuania"]);
-  const middleEastSet = new Set(["United Arab Emirates","UAE","Saudi Arabia","Qatar","Kuwait","Bahrain","Oman","Jordan","Lebanon","Israel"]);
-  const asiaSet = new Set(["India","Pakistan","Bangladesh","China","Japan","South Korea","Indonesia","Philippines","Vietnam","Sri Lanka","Nepal","Malaysia","Thailand","Cambodia","Myanmar","Laos","Mongolia","Taiwan","Singapore"]);
-  function regionForCountry(country){
-    if (!country) return "Other";
-    if (premiumCountries.has(country)) return "Premium";
-    if (europeSet.has(country)) return "Europe";
-    if (middleEastSet.has(country)) return "Middle East";
-    if (asiaSet.has(country)) return "Asia";
-    return "Other";
-  }
-  const regionBonus = {
-    "Premium": 500,
-    "Europe": 370,
-    "Middle East": 350,
-    "Asia": 130,
-    "Other": 100
-  };
+  const tBody = document.getElementById("tBody");
+  const refreshBtn = document.getElementById("refreshBtn");
+  const exportCsvBtn = document.getElementById("exportCsv");
+  const autoChk = document.getElementById("autoRefresh");
+  let autoTimer = null;
 
-  // ---------- HELPER ----------
-  function scoreForUser(u){
-    // u.country expects a country name string
-    const region = regionForCountry(u.country);
-    const bonus = regionBonus[region] || regionBonus["Other"];
-    return baseInviteScore + bonus;
-  }
-  function isActive(u){
-    if (!u.lastActive) return false;
-    // lastActive may be Firestore Timestamp object or ISO string / number
-    const t = (u.lastActive && u.lastActive.toMillis) ? u.lastActive.toMillis() : (u.lastActive ? (new Date(u.lastActive)).getTime() : 0);
-    return (Date.now() - t) < 24*60*60*1000;
-  }
+  // ---- LOAD DASHBOARD ----
+  async function loadDashboard(){
+    tBody.innerHTML = "<tr><td colspan='7'>Loading…</td></tr>";
 
-  // ---------- REALTIME AGGREGATION ----------
-  // We'll listen to users collection realtime
-  const usersCol = collection(db, "users");
-  let allUsers = []; // cached
-  let affiliatesInfo = new Map(); // optional affiliate email data from 'affiliates' collection
+    const now = Date.now();
+    const DAY_24 = 24*60*60*1000;
 
-  // load affiliates collection (optional) to get affiliate emails
-  async function loadAffiliatesMap(){
-    try {
-      const snaps = await getDocs(collection(db, "affiliates"));
-      snaps.forEach(s => {
-        const data = s.data();
-        // key by uppercase name for matching
-        affiliatesInfo.set((data.name || s.id || "").toString().trim().toUpperCase(), data);
+    const usersSnap = await getDocs(collection(db, "users"));
+    let rows = [];
+
+    usersSnap.forEach(docSnap=>{
+      const data = docSnap.data();
+      const invited = data.invitedUsers || [];
+      let total = invited.length;
+      let active = invited.filter(u=>now - u.timestamp <= DAY_24).length;
+      let offline = total - active;
+      let fake = invited.reduce((acc,u,idx)=>{
+        let dup = invited.filter(x=>x.ip===u.ip).length;
+        if(dup>1) acc +=1;
+        return acc;
+      },0);
+
+      // Score calculation based on CPM / group
+      let score = invited.reduce((acc,u)=>{
+        if(u.group === "premium") return acc+500;
+        if(u.group === "europe") return acc+370;
+        if(u.group === "middleeast") return acc+350;
+        if(u.group === "asia") return acc+130;
+        return acc+10;
+      },0);
+
+      rows.push({
+        name: data.name || docSnap.id,
+        total, active, offline, fake, score
       });
-    } catch(e){
-      // no affiliates collection - that's fine
-      console.warn("No affiliates collection or fetch error", e);
-    }
-  }
-  loadAffiliatesMap();
-
-  // realtime listener for users
-  onSnapshot(usersCol, snap => {
-    allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    render();
-  }, err => {
-    console.error("users onSnapshot error", err);
-    document.getElementById("rows").innerHTML = `<tr><td colspan="10" class="small">Error loading users. Check console.</td></tr>`;
-  });
-
-  // main render function
-  function render(){
-    // aggregate per referrer (use uppercase key to avoid case issues)
-    const byRef = new Map();
-    allUsers.forEach(u => {
-      const refRaw = (u.referredBy || "direct").toString().trim();
-      const key = refRaw.toUpperCase();
-      if (!byRef.has(key)) byRef.set(key, { name: refRaw, users: [] });
-      byRef.get(key).users.push(u);
     });
 
-    // build stats array
-    const stats = Array.from(byRef.values()).map(group => {
-      const users = group.users;
-      const total = users.length;
-      const active = users.filter(isActive).length;
-      const fake = (() => {
-        // count duplicates per IP; fake count = extras beyond first
-        const ips = {};
-        users.forEach(x => { const ip = x.ip || "unknown"; ips[ip] = (ips[ip]||0)+1; });
-        return Object.values(ips).reduce((acc,n)=> acc + (n>1 ? n-1 : 0), 0);
-      })();
-      const offline = total - active;
-      const totalScore = users.reduce((s,u) => s + scoreForUser(u), 0);
-      // affiliate email if exists in affiliates map
-      const aff = affiliatesInfo.get(group.name.toUpperCase());
-      const affiliateEmail = aff ? (aff.email || "") : "";
-      return {
-        name: group.name,
-        key: group.name.toUpperCase(),
-        email: affiliateEmail,
-        total, active, offline, fake, totalScore, users
-      };
-    });
+    // Sort by score descending
+    rows.sort((a,b)=>b.score - a.score);
 
-    // Sort by totalScore desc
-    stats.sort((a,b) => b.totalScore - a.totalScore);
-
-    // display top summary & totals
-    const top3 = stats.slice(0,3);
-    document.getElementById("top3").innerHTML = top3.map((t,i)=> `<div style="margin-bottom:6px"><span class="rank-badge">#${i+1}</span> <strong>${t.name}</strong> — ${t.totalScore} pts</div>`).join("") || "<div class='small'>No data</div>";
-    const totalsDiv = document.getElementById("totals");
-    const totalInvitesAll = stats.reduce((a,b)=> a + b.total, 0);
-    totalsDiv.innerHTML = `<div class="small">Affiliates: ${stats.length}</div><div class="small">Total Invites: ${totalInvitesAll}</div>`;
-
-    // render table rows (respect search/topN)
-    const search = (document.getElementById("search").value || "").trim().toUpperCase();
-    const topN = Number(document.getElementById("topN").value||10);
+    // Render
     let html = "";
-    stats.slice(0, topN).forEach((s, idx) => {
-      if (search && !s.name.toUpperCase().includes(search) && !(s.email && s.email.toUpperCase().includes(search))) return;
-      const activePct = s.total ? Math.round((s.active / s.total)*1000)/10 + "%" : "0%";
-      html += `<tr>
-        <td>#${idx+1}</td>
-        <td>${escapeHtml(s.name)}</td>
-        <td>${escapeHtml(s.email||"—")}</td>
-        <td>${s.total}</td>
-        <td>${s.active}</td>
-        <td>${s.offline}</td>
-        <td>${s.fake}</td>
-        <td>${activePct}</td>
-        <td><b>${s.totalScore}</b></td>
-        <td><button data-key="${s.key}" class="detailsBtn">Details</button></td>
+    rows.forEach((r,i)=>{
+      html+=`<tr>
+        <td>${i+1}</td>
+        <td>${r.name}</td>
+        <td>${r.total}</td>
+        <td>${r.active}</td>
+        <td>${r.offline}</td>
+        <td>${r.fake}</td>
+        <td>${r.score}</td>
       </tr>`;
     });
-
-    document.getElementById("rows").innerHTML = html || `<tr><td colspan="10" class="small">No matching affiliates</td></tr>`;
-
-    // attach detail handlers
-    document.querySelectorAll(".detailsBtn").forEach(btn => {
-      btn.onclick = () => openDetails(btn.getAttribute("data-key"));
-    });
+    tBody.innerHTML = html;
   }
 
-  // Escape helper to avoid XSS in names/emails
-  function escapeHtml(s){ return String(s || "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
-
-  // ---------- DETAILS ----------
-  function openDetails(keyUpper){
-    // find group
-    const group = Array.from(allUsers).filter(u => ((u.referredBy||"direct")+"").trim().toUpperCase() === keyUpper);
-    const name = keyUpper;
-    const modal = document.getElementById("modal");
-    document.getElementById("modalTitle").textContent = `Details — ${name}`;
-    document.getElementById("modalSubtitle").textContent = `Total invited: ${group.length}`;
-
-    // country breakdown
-    const countryMap = new Map();
-    group.forEach(u => {
-      const country = (u.country || "Unknown") + "";
-      countryMap.set(country, (countryMap.get(country)||0) + 1);
-    });
-    const countryRows = Array.from(countryMap.entries()).map(([country,count])=>{
-      // compute subtotal score for that country
-      const subtotal = group.filter(u => (u.country||"")+"")==country).reduce((s,u)=> s + scoreForUser(u), 0);
-      return `<tr><td>${escapeHtml(country)}</td><td>${count}</td><td>${subtotal}</td></tr>`;
-    }).join("");
-    document.querySelector("#countryTable tbody").innerHTML = countryRows || `<tr><td colspan="3">No data</td></tr>`;
-
-    // invited users list
-    const inviteRows = group.map(u => {
-      const active = isActive(u);
-      const sc = scoreForUser(u);
-      return `<tr>
-        <td>${escapeHtml(u.email || "—")}</td>
-        <td>${escapeHtml(u.country || "—")}</td>
-        <td>${escapeHtml(u.ip || "—")}</td>
-        <td>${active ? "Active" : "Offline"}</td>
-        <td>${sc}</td>
-      </tr>`;
-    }).join("");
-    document.querySelector("#inviteTable tbody").innerHTML = inviteRows || `<tr><td colspan="5">No invites</td></tr>`;
-
-    // explanation
-    const premiumCount = group.filter(u => premiumCountries.has(u.country)).length;
-    const europeCount = group.filter(u => europeSet.has(u.country)).length;
-    const topReason = premiumCount > 0 ? `This affiliate has ${premiumCount} invites from premium countries (USA/UK/Canada/etc.), which gives heavy score boost.` : (europeCount>0 ? `Has ${europeCount} invites from Europe (good CPM).` : `No premium country invites — score mostly from base and regional bonuses.`);
-
-    document.getElementById("whyText").textContent = `${topReason} Total invites: ${group.length}. Total score is sum(base 10 + region bonus per invite).`;
-
-    modal.style.display = "flex";
-  }
-
-  document.getElementById("closeBtn").onclick = () => document.getElementById("modal").style.display = "none";
-  document.getElementById("search").addEventListener("input", render);
-  document.getElementById("topN").addEventListener("change", render);
-
-  // CSV export
-  document.getElementById("export").addEventListener("click", ()=>{
-    const rows = document.querySelectorAll("#rows tr");
-    let csv = "Rank,Name,Email,TotalInvites,Active,Offline,Fake,Active%,Score\n";
-    rows.forEach((r, idx) => {
-      const cols = r.querySelectorAll("td");
-      if (cols.length){
-        csv += `${cols[0].textContent},${cols[1].textContent},${cols[2].textContent},${cols[3].textContent},${cols[4].textContent},${cols[5].textContent},${cols[6].textContent},${cols[7].textContent},${cols[8].textContent}\n`;
+  refreshBtn.addEventListener("click",()=>loadDashboard());
+  exportCsvBtn.addEventListener("click",()=>{
+    let csv = "Rank,Name,Total,Active,Offline,Fake,Score\n";
+    const rows = Array.from(tBody.querySelectorAll("tr"));
+    rows.forEach(r=>{
+      const c = r.querySelectorAll("td");
+      if(c.length===7){
+        csv+=`${c[0].textContent},${c[1].textContent},${c[2].textContent},${c[3].textContent},${c[4].textContent},${c[5].textContent},${c[6].textContent}\n`;
       }
     });
-    const blob = new Blob([csv], {type:"text/csv"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "affiliate_leaderboard.csv"; a.click();
-    URL.revokeObjectURL(url);
+    const blob = new Blob([csv],{type:"text/csv"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "affiliate_dashboard.csv";
+    a.click();
   });
 
-  // initial render fallback
-  render();
+  autoChk.addEventListener("change",()=>{
+    if(autoChk.checked){
+      autoTimer = setInterval(loadDashboard,10000);
+    }else{
+      clearInterval(autoTimer);
+      autoTimer = null;
+    }
+  });
+
+  loadDashboard();
 </script>
 </body>
 </html>
