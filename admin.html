@@ -1,59 +1,42 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Admin — Referral Engagement Dashboard</title>
-  <meta name="robots" content="noindex">
+  <meta charset="UTF-8">
+  <title>Referral Admin Dashboard</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js"></script>
   <style>
-    body{font-family:Arial,Helvetica,sans-serif;background:#f6f7fb;margin:0;padding:24px}
-    .wrap{max-width:1100px;margin:0 auto}
-    h1{margin:0 0 12px}
-    .bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
-    input,button{padding:8px 10px;border-radius:8px;border:1px solid #ddd}
-    table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 6px 18px rgba(20,20,40,.06)}
-    th,td{padding:10px;border-bottom:1px solid #eee;text-align:center}
-    th{background:#f0f6ff}
-    tr:last-child td{border-bottom:0}
-    .small{font-size:12px;color:#666}
+    body { font-family: Arial, sans-serif; background:#f5f5f5; padding:20px; }
+    table { width:100%; border-collapse:collapse; background:#fff; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
+    th, td { padding:10px; text-align:center; border:1px solid #ddd; }
+    th { background:#222; color:#fff; }
+    tr:nth-child(even){background:#f9f9f9;}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Referral Engagement Dashboard</h1>
-  <div class="bar small">
-    <span><b>Tip:</b> Active = last visit in the past 24 hours. Fake = duplicate IP accounts.</span>
-    <span style="margin-left:auto">Auto-refresh <input type="checkbox" id="auto"> every 10s</span>
-    <button id="refresh">Refresh</button>
-    <button id="export">Export CSV</button>
-  </div>
-
+  <h2>Referral Engagement Dashboard</h2>
   <table>
     <thead>
       <tr>
         <th>Name</th>
-        <th>USERS</th>
+        <th>Gmail</th>
+        <th>Total Users</th>
         <th>Active Users (24h)</th>
         <th>Offline Users</th>
-        <th>Fake Users (same IP)</th>
+        <th>Fake Users (Same IP)</th>
       </tr>
     </thead>
-    <tbody id="rows">
-      <tr><td colspan="5">Loading…</td></tr>
+    <tbody id="stats-body">
+      <tr><td colspan="6">Loading…</td></tr>
     </tbody>
   </table>
 
-  <p class="small" style="margin-top:8px">
-    Source collections: <code>users</code> (one per browser/client) and <code>visitLogs</code> (optional).<br>
-    Security note: anyone who knows this URL can view it unless you protect it (ask me to add a simple key/password).
-  </p>
-</div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import { getFirestore, collection, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-
-// 🔑 same config
-const firebaseConfig = {
+    const firebaseConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
   projectId: "adwatchrewardsapp",
@@ -62,95 +45,67 @@ const firebaseConfig = {
   appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
   measurementId: "G-4NG2564HTK"
 };
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 
-const rows = document.getElementById("rows");
-const btn = document.getElementById("refresh");
-const exp = document.getElementById("export");
-const auto = document.getElementById("auto");
-let timer = null;
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-function isActiveIn24h(lastActiveTs) {
-  if (!lastActiveTs) return false;
-  const last = lastActiveTs instanceof Timestamp ? lastActiveTs.toDate() : new Date(lastActiveTs);
-  return (Date.now() - last.getTime()) < 24*60*60*1000; // 24h
-}
+    async function loadStats() {
+      const tbody = document.getElementById("stats-body");
+      tbody.innerHTML = "<tr><td colspan='6'>Fetching data…</td></tr>";
 
-async function load() {
-  rows.innerHTML = "<tr><td colspan='5'>Loading…</td></tr>";
+      const usersSnap = await getDocs(collection(db, "users"));
+      if (usersSnap.empty) {
+        tbody.innerHTML = "<tr><td colspan='6'>No data found</td></tr>";
+        return;
+      }
 
-  const snap = await getDocs(collection(db, "users"));
-  const byRef = new Map(); // referredBy -> { total, active, offline, ipCounts: Map }
+      const inviterStats = {};
 
-  snap.forEach(docSnap => {
-    const u = docSnap.data();
-    const nameRaw = (u.referredBy || "direct").toString();
-    const name = nameRaw.trim();
-    const ip = (u.ip || "unknown").toString();
-    const active = isActiveIn24h(u.lastActive);
+      usersSnap.forEach(doc => {
+        const user = doc.data();
+        const inviter = user.inviter || "Unknown";
+        const gmail = user.email || "N/A";
+        const lastSeen = user.lastSeen ? new Date(user.lastSeen.toDate ? user.lastSeen.toDate() : user.lastSeen) : null;
+        const ip = user.ip || "0.0.0.0";
 
-    if (!byRef.has(name)) {
-      byRef.set(name, { total:0, active:0, offline:0, ipCounts: new Map() });
+        if (!inviterStats[inviter]) {
+          inviterStats[inviter] = { gmail, total:0, active:0, offline:0, fake:0, ips:{} };
+        }
+
+        inviterStats[inviter].total++;
+
+        if (lastSeen) {
+          const diff = (Date.now() - lastSeen.getTime()) / (1000*60*60); // hours
+          if (diff <= 24) inviterStats[inviter].active++;
+          else inviterStats[inviter].offline++;
+        } else {
+          inviterStats[inviter].offline++;
+        }
+
+        if (inviterStats[inviter].ips[ip]) {
+          inviterStats[inviter].fake++;
+        } else {
+          inviterStats[inviter].ips[ip] = true;
+        }
+      });
+
+      tbody.innerHTML = "";
+      for (let name in inviterStats) {
+        const s = inviterStats[name];
+        tbody.innerHTML += `
+          <tr>
+            <td>${name}</td>
+            <td>${s.gmail}</td>
+            <td>${s.total}</td>
+            <td>${s.active}</td>
+            <td>${s.offline}</td>
+            <td>${s.fake}</td>
+          </tr>
+        `;
+      }
     }
-    const bucket = byRef.get(name);
-    bucket.total += 1;
-    if (active) bucket.active += 1; else bucket.offline += 1;
 
-    // IP counting for "fake"
-    const v = (bucket.ipCounts.get(ip) || 0) + 1;
-    bucket.ipCounts.set(ip, v);
-  });
-
-  // Render
-  const arr = Array.from(byRef.entries()).sort((a,b)=> b[1].total - a[1].total);
-  if (arr.length === 0) {
-    rows.innerHTML = "<tr><td colspan='5'>No users found.</td></tr>";
-    return;
-  }
-
-  let html = "";
-  arr.forEach(([name, stats]) => {
-    const fake = Array.from(stats.ipCounts.values())
-      .reduce((sum,n)=> sum + (n>1 ? (n-1) : 0), 0);
-    html += `<tr>
-      <td>${name}</td>
-      <td>${stats.total}</td>
-      <td>${stats.active}</td>
-      <td>${stats.offline}</td>
-      <td>${fake}</td>
-    </tr>`;
-  });
-  rows.innerHTML = html;
-}
-
-btn.addEventListener("click", load);
-
-auto.addEventListener("change", ()=>{
-  if (auto.checked) {
-    timer = setInterval(load, 10000);
-  } else {
-    clearInterval(timer); timer = null;
-  }
-});
-
-exp.addEventListener("click", ()=>{
-  // Build CSV from current table
-  let csv = "Name,USERS,Active Users,Offline Users,Fake Users\n";
-  const trs = rows.querySelectorAll("tr");
-  trs.forEach(tr=>{
-    const tds = tr.querySelectorAll("td");
-    if (tds.length === 5) {
-      csv += `${tds[0].textContent},${tds[1].textContent},${tds[2].textContent},${tds[3].textContent},${tds[4].textContent}\n`;
-    }
-  });
-  const blob = new Blob([csv], {type:"text/csv"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = "referral_dashboard.csv"; a.click();
-  URL.revokeObjectURL(url);
-});
-
-load();
-</script>
+    loadStats();
+  </script>
 </body>
 </html>
