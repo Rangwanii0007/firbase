@@ -5,55 +5,72 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Affiliate Admin Dashboard</title>
 <style>
-body{font-family:Arial,sans-serif;background:#f5f5f7;margin:0;padding:0}
-#loginBox{width:300px;margin:50px auto;padding:20px;background:#fff;border-radius:10px;box-shadow:0 5px 15px rgba(0,0,0,0.1)}
-#dashboard{display:none;padding:20px}
-table{width:100%;border-collapse:collapse;margin-top:15px}
-th,td{padding:10px;border:1px solid #eee;text-align:center}
-th{background:#f0f6ff}
-button{padding:6px 10px;border-radius:6px;border:none;background:#2d89ff;color:#fff;cursor:pointer}
-.details-btn{background:#ff7a45;color:#fff;}
-.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center}
-.modal-content{background:#fff;padding:20px;border-radius:10px;width:80%;max-height:80%;overflow:auto}
-.rank1{color:#ffb400;font-weight:bold}
-.rank2{color:#4caf50;font-weight:bold}
-.rank3{color:#2196f3;font-weight:bold}
+body {font-family: Arial, sans-serif; background: #f4f6fa; margin:0; padding:0;}
+header {background:#1f2937; color:white; padding:15px; text-align:center;}
+.container {max-width:1200px; margin:20px auto; background:white; padding:20px; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.06);}
+table {width:100%; border-collapse:collapse;}
+th, td {padding:10px; text-align:center; border:1px solid #ddd;}
+th {background:#3b82f6; color:white;}
+button {padding:6px 10px; border-radius:5px; border:none; background:#3b82f6; color:white; cursor:pointer;}
+button:hover {background:#2563eb;}
+.modal {display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center;}
+.modal-content {background:white; padding:20px; border-radius:10px; max-width:800px; width:90%; max-height:80%; overflow:auto;}
+input[type=password]{padding:8px; border-radius:5px; border:1px solid #ccc; width:200px;}
+.login-box{text-align:center; margin-top:200px;}
 </style>
 </head>
 <body>
 
-<div id="loginBox">
+<div id="login" class="login-box">
   <h2>Admin Login</h2>
-  <input type="text" id="username" placeholder="Username"><br><br>
-  <input type="password" id="password" placeholder="Password"><br><br>
+  <input type="password" id="adminPass" placeholder="Enter Password">
   <button id="loginBtn">Login</button>
 </div>
 
-<div id="dashboard">
+<div id="dashboard" class="container" style="display:none;">
   <h2>Affiliate Leaderboard (Realtime)</h2>
-  <p>Active = visited in last 24h · Fake = multiple accounts from same IP</p>
+  <p>Active = visited in last 24 hours · Fake = multiple accounts from same IP · Auto updates every 10s</p>
+  <input type="text" id="searchInput" placeholder="Search name...">
+  <button id="exportCsv">Export CSV</button>
   <table>
     <thead>
       <tr>
-        <th>Rank</th><th>Name</th><th>Total Invites</th><th>Active (24h)</th><th>Offline</th><th>Fake</th><th>Active %</th><th>Total Score</th><th>Details</th>
+        <th>Rank</th>
+        <th>Name</th>
+        <th>Gmail</th>
+        <th>Total Invites</th>
+        <th>Active (24h)</th>
+        <th>Offline</th>
+        <th>Fake</th>
+        <th>Active %</th>
+        <th>Total Score</th>
+        <th>Details</th>
       </tr>
     </thead>
-    <tbody id="tbody">
-      <tr><td colspan="9">Loading…</td></tr>
+    <tbody id="leaderboard">
+      <tr><td colspan="10">Loading…</td></tr>
     </tbody>
   </table>
 </div>
 
-<div class="modal" id="detailsModal">
+<!-- Modal for Details -->
+<div id="modal" class="modal">
   <div class="modal-content">
-    <h3>Referral Details</h3>
-    <table>
-      <thead>
-        <tr><th>Name</th><th>Email</th><th>Country</th><th>IP</th><th>Active (24h)</th></tr>
-      </thead>
-      <tbody id="detailsBody"></tbody>
-    </table>
     <button id="closeModal">Close</button>
+    <h3 id="modalTitle">Affiliate Details</h3>
+    <table id="detailsTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Country</th>
+          <th>IP</th>
+          <th>Active</th>
+          <th>Fake</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 </div>
 
@@ -61,7 +78,7 @@ button{padding:6px 10px;border-radius:6px;border:none;background:#2d89ff;color:#
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-// Firebase config
+// -------------------- FIREBASE CONFIG --------------------
 const firebaseConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
@@ -74,104 +91,119 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// LOGIN
-document.getElementById('loginBtn').onclick = ()=>{
-  const u = document.getElementById('username').value.trim();
-  const p = document.getElementById('password').value.trim();
-  if(u==='admin' && p==='nadeem'){
-    document.getElementById('loginBox').style.display='none';
-    document.getElementById('dashboard').style.display='block';
-    loadLeaderboard();
-  } else alert('Invalid credentials!');
-};
+// -------------------- PASSWORD LOGIN --------------------
+const loginBox = document.getElementById('login');
+const dashboard = document.getElementById('dashboard');
+document.getElementById('loginBtn').addEventListener('click', ()=>{
+  const pass = document.getElementById('adminPass').value;
+  if(pass==='nadeem'){ loginBox.style.display='none'; dashboard.style.display='block'; loadLeaderboard(); startAutoRefresh(); }
+  else{ alert('Wrong password'); }
+});
 
-// Country CPM scores
-const countryScores = {
-  'Asia':130,'Europe':370,'Middle East':350,'USA':500,'Canada':500,'UK':500
-};
-function getCountryScore(country){ return countryScores[country]||10; }
-
-// Load leaderboard
-async function loadLeaderboard(){
-  const snap = await getDocs(collection(db,'referrals'));
-  const affiliates = {};
-  const now = new Date();
-
-  snap.forEach(doc=>{
-    const d = doc.data();
-    const name = d.referrer || 'unknown';
-    const country = d.country || 'Unknown';
-    const ip = d.ip || '';
-    const ts = d.timestamp?.toDate ? d.timestamp.toDate() : now;
-
-    if(!affiliates[name]) affiliates[name]={total:0,active:0,offline:0,fake:0,ips:{},users:[]};
-    affiliates[name].total++;
-    const isActive = ((now - ts)/36e5)<=24;
-    if(isActive) affiliates[name].active++; else affiliates[name].offline++;
-    affiliates[name].users.push({ ...d, active:isActive });
-    affiliates[name].ips[ip] = (affiliates[name].ips[ip]||0)+1;
-  });
-
-  // Fake calculation
-  Object.keys(affiliates).forEach(name=>{
-    let f=0;
-    Object.values(affiliates[name].ips).forEach(v=>{ if(v>1) f+=v-1; });
-    affiliates[name].fake=f;
-  });
-
-  // Compute active % and score
-  const leaderboard = [];
-  Object.keys(affiliates).forEach(name=>{
-    const a = affiliates[name];
-    const activePerc = Math.round((a.active/a.total)*100);
-    let score=0;
-    a.users.forEach(u=>{ score += 10 + getCountryScore(u.country); });
-    leaderboard.push({...a,name,activePerc,score});
-  });
-
-  leaderboard.sort((a,b)=>b.score-a.score);
-
-  // Render table
-  const tbody = document.getElementById('tbody');
-  tbody.innerHTML='';
-  leaderboard.forEach((a,i)=>{
-    const rankClass = i===0?'rank1':i===1?'rank2':i===2?'rank3':'';
-    const row = document.createElement('tr');
-    row.innerHTML=`
-      <td class="${rankClass}">${i+1}</td>
-      <td>${a.name}</td>
-      <td>${a.total}</td>
-      <td>${a.active}</td>
-      <td>${a.offline}</td>
-      <td>${a.fake}</td>
-      <td>${a.activePerc}%</td>
-      <td>${a.score}</td>
-      <td><button class="details-btn" data-name="${a.name}">Details</button></td>
-    `;
-    tbody.appendChild(row);
-  });
-
-  // Modal details
-  document.querySelectorAll('.details-btn').forEach(btn=>{
-    btn.onclick = ()=>{
-      const name = btn.getAttribute('data-name');
-      const detailsBody = document.getElementById('detailsBody');
-      detailsBody.innerHTML='';
-      affiliates[name].users.forEach(u=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML=`<td>${name}</td><td>${u.email||'N/A'}</td><td>${u.country}</td><td>${u.ip}</td><td>${u.active?'Yes':'No'}</td>`;
-        detailsBody.appendChild(tr);
-      });
-      document.getElementById('detailsModal').style.display='flex';
-    };
-  });
-
-  document.getElementById('closeModal').onclick = ()=>{ document.getElementById('detailsModal').style.display='none'; };
+// -------------------- CPM SCORE --------------------
+function getCPMScore(country){
+  country = country.toLowerCase();
+  if(['usa','canada','uk'].includes(country)) return 500;
+  if(['germany','france','italy','spain','europe'].includes(country)) return 370;
+  if(['uae','saudi arabia','qatar','middle east'].includes(country)) return 350;
+  return 130; // asia/others
 }
 
-// Auto refresh leaderboard every 30 seconds
-setInterval(()=>{ if(document.getElementById('dashboard').style.display==='block') loadLeaderboard(); },30000);
+// -------------------- LOAD LEADERBOARD --------------------
+const leaderboardTbody = document.getElementById('leaderboard');
+const modal = document.getElementById('modal');
+const detailsTableBody = modal.querySelector('tbody');
+const closeModal = document.getElementById('closeModal');
+closeModal.addEventListener('click', ()=> modal.style.display='none');
 
+async function loadLeaderboard(){
+  leaderboardTbody.innerHTML="<tr><td colspan='10'>Loading…</td></tr>";
+  const snap = await getDocs(collection(db,'referrals'));
+  let dataArr = [];
+  snap.forEach(d=>{
+    const data = d.data();
+    const total = data.users?.length || 0;
+    const active24 = data.users?.filter(u=>{
+      const ts = u.timestamp?.toDate?.() || new Date();
+      return ((new Date()-ts)/1000/60/60)<=24;
+    }).length || 0;
+    const offline = total - active24;
+    const fake = data.users?.filter(u=>u.fake).length || 0;
+    const score = data.users?.reduce((acc,u)=>acc+getCPMScore(u.country||'')+10,0)||0;
+    const activePercent = total?Math.round(active24/total*100):0;
+    dataArr.push({...data, total, active24, offline, fake, score, activePercent});
+  });
+  
+  // Sort by score descending
+  dataArr.sort((a,b)=>b.score-a.score);
+  leaderboardTbody.innerHTML="";
+  dataArr.forEach((d,i)=>{
+    leaderboardTbody.innerHTML+=`<tr>
+      <td>${i+1}</td>
+      <td>${d.name||'N/A'}</td>
+      <td>${d.email||'N/A'}</td>
+      <td>${d.total}</td>
+      <td>${d.active24}</td>
+      <td>${d.offline}</td>
+      <td>${d.fake}</td>
+      <td>${d.activePercent}%</td>
+      <td>${d.score}</td>
+      <td><button class="detailsBtn" data-name="${d.name}">Details</button></td>
+    </tr>`;
+  });
+
+  // Attach click events for Details
+  document.querySelectorAll('.detailsBtn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const name = btn.getAttribute('data-name');
+      const docSnap = await getDocs(collection(db,'referrals'));
+      const docData = Array.from(docSnap.docs).find(d=>d.id===name)?.data();
+      if(docData){
+        detailsTableBody.innerHTML='';
+        docData.users?.forEach(u=>{
+          detailsTableBody.innerHTML+=`<tr>
+            <td>${name}</td>
+            <td>${u.email||'N/A'}</td>
+            <td>${u.country||'N/A'}</td>
+            <td>${u.ip||'N/A'}</td>
+            <td>${((new Date()-u.timestamp?.toDate?.())/1000/60/60)<=24?'Yes':'No'}</td>
+            <td>${u.fake?'Yes':'No'}</td>
+          </tr>`;
+        });
+        modal.style.display='flex';
+      }
+    });
+  });
+}
+
+// -------------------- AUTO REFRESH --------------------
+let autoTimer = null;
+function startAutoRefresh(){
+  autoTimer = setInterval(loadLeaderboard, 10000);
+}
+
+// -------------------- SEARCH FILTER --------------------
+document.getElementById('searchInput').addEventListener('input', (e)=>{
+  const val = e.target.value.toLowerCase();
+  document.querySelectorAll('#leaderboard tr').forEach(tr=>{
+    const name = tr.children[1]?.textContent.toLowerCase()||'';
+    tr.style.display = name.includes(val)?'':'none';
+  });
+});
+
+// -------------------- EXPORT CSV --------------------
+document.getElementById('exportCsv').addEventListener('click', ()=>{
+  let csv = "Rank,Name,Gmail,Total Invites,Active (24h),Offline,Fake,Active %,Total Score\n";
+  document.querySelectorAll('#leaderboard tr').forEach((tr,i)=>{
+    const cols = Array.from(tr.children).slice(0,9).map(td=>td.textContent.replace(/,/g,''));
+    if(cols.length) csv+=cols.join(",")+"\n";
+  });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'affiliate_leaderboard.csv'; a.click();
+});
 </script>
+
 </body>
 </html>
