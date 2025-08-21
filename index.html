@@ -2754,11 +2754,12 @@
         });
     </script>
 //TREAKCER
+<!-- Referral Tracker Script -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-// -------------------- FIREBASE CONFIG --------------------
+// ----- Firebase Config -----
 const firebaseConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
@@ -2768,69 +2769,67 @@ const firebaseConfig = {
   appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
   measurementId: "G-4NG2564HTK"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// -------------------- UTILITY --------------------
-function getReferrer() {
-  const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('ref') || 'unknown';
-}
-function getCPMScore(country){
-  country = country.toLowerCase();
-  if(['usa','canada','uk'].includes(country)) return 500;
-  if(['germany','france','italy','spain','europe'].includes(country)) return 370;
-  if(['uae','saudi arabia','qatar','middle east'].includes(country)) return 350;
-  return 130; // asia/others
-}
-async function getVisitorInfo(){
-  try{
+// --- Get referral from URL ---
+const urlParams = new URLSearchParams(window.location.search);
+let refName = urlParams.get('ref') || 'unknown';
+
+// Optional: Ask visitor email
+let visitorEmail = prompt("Enter your email (optional for tracking):");
+
+// Get visitor IP & country via free API
+async function getVisitorInfo() {
+  try {
     const res = await fetch('https://ipapi.co/json/');
-    return await res.json();
-  } catch(e){ return {ip:'unknown', country:'unknown'}; }
+    const data = await res.json();
+    return {
+      ip: data.ip || 'unknown',
+      country: data.country_name || 'unknown'
+    };
+  } catch (e) {
+    return { ip: 'unknown', country: 'unknown' };
+  }
 }
 
-// -------------------- TRACK VISIT --------------------
-async function trackVisit(){
-  const name = getReferrer();
-  const visitor = await getVisitorInfo();
-  const docRef = doc(db, 'referrals', name);
-  const docSnap = await getDoc(docRef);
-  
-  let data = { name:name, users:[], total:0 };
-  if(docSnap.exists()) data = docSnap.data();
+async function recordReferral() {
+  const info = await getVisitorInfo();
 
-  let isFake = data.users.some(u => u.ip === visitor.ip || u.email === visitor.email);
+  // Check duplicate (same IP or email)
+  const q = query(collection(db, "referrals"), 
+                  where("refName", "==", refName),
+                  where("email", "==", visitorEmail || ''));
+  const existing = await getDocs(q);
 
-  const newUser = {
-    email: visitor.email || '',
-    country: visitor.country,
-    ip: visitor.ip,
-    active:true,
-    timestamp: serverTimestamp(),
-    fake:isFake
-  };
+  let isFake = existing.size > 0;
 
-  data.users.push(newUser);
-  data.total = data.users.length;
+  // Calculate CPM score per country
+  let countryScore = 0;
+  const country = info.country;
+  if(['USA','Canada','UK','Germany','France'].includes(country)) countryScore = 370;
+  else if(['UAE','Saudi Arabia','Qatar','Kuwait'].includes(country)) countryScore = 350;
+  else countryScore = 130; // Asia / others
 
-  let active=0, offline=0, fake=0, score=0;
-  const now = new Date();
-  data.users.forEach(u=>{
-    const ts = u.timestamp?.toDate?.() || now;
-    if(u.fake) fake++;
-    else if((now-ts)/1000/60/60 <=24) active++;
-    else offline++;
-    score += getCPMScore(u.country) + 10; // per invite + country CPM
+  const baseScore = 10;
+
+  await addDoc(collection(db, "referrals"), {
+    refName,
+    email: visitorEmail || 'N/A',
+    ip: info.ip,
+    country: info.country,
+    timestamp: new Date().toISOString(),
+    fake: isFake,
+    score: baseScore + countryScore
   });
 
-  await setDoc(docRef, {...data, active, offline, fake, score});
+  console.log("Referral recorded for", refName, "Score:", baseScore + countryScore);
 }
 
-// Track visit on page load
-trackVisit().catch(console.error);
+// Execute
+recordReferral();
 </script>
-
 
 </body>
 </html>
