@@ -2754,154 +2754,138 @@
         });
     </script>
 //TREAKCER
-
-<!-- START: Referral + Tracker script (paste before </body>) -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-  import {
-    getFirestore, doc, getDoc, setDoc, updateDoc,
-    serverTimestamp, collection, addDoc, increment
-  } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+  // Import Firebase SDK
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-  // ---------- YOUR FIREBASE CONFIG (already provided by you) ----------
+  // ✅ Firebase config (replace with your own project credentials)
   const firebaseConfig = {
-    apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
-    authDomain: "adwatchrewardsapp.firebaseapp.com",
-    projectId: "adwatchrewardsapp",
-    storageBucket: "adwatchrewardsapp.firebasestorage.app",
-    messagingSenderId: "782268735936",
-    appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
-    measurementId: "G-4NG2564HTK"
-  };
-  // --------------------------------------------------------------------
+  apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
+  authDomain: "adwatchrewardsapp.firebaseapp.com",
+  projectId: "adwatchrewardsapp",
+  storageBucket: "adwatchrewardsapp.firebasestorage.app",
+  messagingSenderId: "782268735936",
+  appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
+  measurementId: "G-4NG2564HTK"
 
+  // Init Firebase
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // ---------- helpers ----------
-  function uuid() {
-    return ([1e7]+-1e3+-4e3+-8e3+-1e11)
-      .replace(/[018]/g, c =>
-        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-      );
-  }
+  // ✅ Scoring rules by region
+  const scoringRules = {
+    ASIA: 130,
+    EUROPE: 370,
+    MIDDLE_EAST: 350,
+    PREMIUM: 500, // USA, UK, CANADA, AUSTRALIA, GERMANY etc.
+    DEFAULT: 10   // fallback per invite
+  };
 
-  async function getIpAndCountry() {
-    try {
-      // 1) get IP
-      const ipRes = await fetch("https://api.ipify.org?format=json", { cache: "no-store" });
-      const ipJson = await ipRes.json();
-      const ip = ipJson.ip || "unknown";
+  // ✅ Detect user country group (simplified by IP or manual input)
+  function getRegion(country) {
+    country = country?.toUpperCase();
+    if (!country) return "DEFAULT";
 
-      // 2) get country via ipwho.is (CORS friendly)
-      let country = "Unknown";
-      try {
-        const cRes = await fetch(`https://ipwho.is/${ip}`);
-        const cJson = await cRes.json();
-        if (cJson && cJson.success && cJson.country) country = cJson.country;
-      } catch (e) {
-        // fallback: unknown
-      }
-      return { ip, country };
-    } catch (e) {
-      console.warn("IP/country fetch failed", e);
-      return { ip: "unknown", country: "Unknown" };
+    if (["USA","CANADA","UK","AUSTRALIA","GERMANY","FRANCE"].includes(country)) {
+      return "PREMIUM";
     }
+    if (["PAKISTAN","INDIA","BANGLADESH","CHINA","INDONESIA"].includes(country)) {
+      return "ASIA";
+    }
+    if (["UAE","QATAR","SAUDI ARABIA","OMAN","KUWAIT"].includes(country)) {
+      return "MIDDLE_EAST";
+    }
+    if (["ITALY","SPAIN","POLAND","NETHERLANDS"].includes(country)) {
+      return "EUROPE";
+    }
+    return "DEFAULT";
   }
 
-  function todayYMD() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  // ✅ Calculate score
+  function calculateScore(invites) {
+    let totalScore = 0;
+    invites.forEach(invite => {
+      const region = getRegion(invite.country);
+      totalScore += scoringRules[region] || scoringRules.DEFAULT;
+    });
+    return totalScore;
   }
 
-  // ---------- identify client ----------
-  let clientId = localStorage.getItem("clientId");
-  if (!clientId) {
-    clientId = uuid();
-    localStorage.setItem("clientId", clientId);
-  }
-
-  // ---------- read URL params ----------
-  const params = new URLSearchParams(window.location.search);
-  const referredByIncoming = params.get("ref") ? String(params.get("ref")).trim() : null;
-  const emailParam = params.get("email") ? String(params.get("email")).trim() : null;
-
-  // ---------- main tracker ----------
-  (async function mainTracker(){
-    const { ip, country } = await getIpAndCountry();
-    const userRef = doc(db, "users", clientId);
-    const today = todayYMD();
-
+  // ✅ Save user signup
+  async function registerUser(name, email, country, ip) {
     try {
-      const snap = await getDoc(userRef);
+      const userRef = doc(db, "users", email); // email = unique ID
+      const userDoc = await getDoc(userRef);
 
-      if (!snap.exists()) {
-        // first time on this browser/device -> create user doc
+      if (!userDoc.exists()) {
         await setDoc(userRef, {
-          referredBy: referredByIncoming || "direct",
-          email: emailParam || null,
-          ip,
-          country,
-          signupAt: serverTimestamp(),
-          lastActive: serverTimestamp(),
-          lastActiveYMD: today,
-          visits: 1
+          name: name,
+          email: email,
+          country: country,
+          ip: ip,
+          invites: [],  // later store invited users
+          score: 0,
+          status: "active",
+          createdAt: new Date()
         });
-
+        console.log("✅ User registered:", email);
       } else {
-        // returning visitor -> update lastActive + visits (atomic increment)
-        const data = snap.data();
-        await updateDoc(userRef, {
-          visits: increment(1),
-          lastActive: serverTimestamp(),
-          lastActiveYMD: today,
-          // keep earlier referredBy/email/ip/country if set; only fill missing ones
-          referredBy: data.referredBy || referredByIncoming || "direct",
-          email: data.email || emailParam || null,
-          ip: data.ip || ip,
-          country: data.country || country
-        });
+        console.log("⚠️ User already exists:", email);
       }
-
-      // optional: store visit log for analytics
-      await addDoc(collection(db, "visitLogs"), {
-        clientId,
-        referredBy: referredByIncoming || (snap && snap.exists() ? (snap.data().referredBy || "direct") : "direct"),
-        email: emailParam || (snap && snap.exists() ? (snap.data().email || null) : null),
-        ip,
-        country,
-        when: serverTimestamp(),
-        ymd: today
-      });
-
-      // optional helper: create a minimal affiliates doc so admin can show affiliate email later
-      if (referredByIncoming) {
-        try {
-          const affKey = referredByIncoming.trim().toUpperCase();
-          const affRef = doc(db, "affiliates", affKey);
-          const affSnap = await getDoc(affRef);
-          if (!affSnap.exists()) {
-            // create basic affiliate record (you can later update via admin)
-            await setDoc(affRef, {
-              name: referredByIncoming,
-              createdAt: serverTimestamp()
-            });
-          }
-        } catch(e) {
-          console.warn("affiliate create failed", e);
-        }
-      }
-
-      console.log("Referral tracker: OK", { clientId, referredByIncoming, ip, country });
-
     } catch (err) {
-      console.error("Referral tracker error:", err);
+      console.error("Error adding user:", err);
     }
-  })();
+  }
+
+  // ✅ Add invite to user
+  async function addInvite(userEmail, inviteData) {
+    try {
+      const userRef = doc(db, "users", userEmail);
+      const userDoc = await getDoc(userRef);
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const newInvites = [...userData.invites, inviteData];
+        const newScore = calculateScore(newInvites);
+
+        await updateDoc(userRef, {
+          invites: newInvites,
+          score: newScore
+        });
+
+        console.log("✅ Invite added. New score:", newScore);
+      }
+    } catch (err) {
+      console.error("Error adding invite:", err);
+    }
+  }
+
+  // ✅ Example usage on signup form submit
+  document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("signupForm");
+    if (form) {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = form.querySelector("#name").value;
+        const email = form.querySelector("#email").value;
+        const country = form.querySelector("#country").value;
+
+        // fetch IP
+        let ip = "Unknown";
+        try {
+          const res = await fetch("https://api64.ipify.org?format=json");
+          const data = await res.json();
+          ip = data.ip;
+        } catch (e) {}
+
+        await registerUser(name, email, country, ip);
+
+        alert("Signup successful!");
+      });
+    }
+  });
 </script>
-<!-- END: Referral + Tracker script -->
-
-
 
 </body>
 </html>
