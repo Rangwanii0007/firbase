@@ -2,51 +2,133 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Referral Dashboard</title>
+  <title>Referral Traffic Dashboard</title>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background: #333;
+      color: #fff;
+    }
+    tr:nth-child(even) {
+      background: #f2f2f2;
+    }
+  </style>
 </head>
 <body>
-  <h1>Referral Traffic Dashboard</h1>
-  <table border="1" cellpadding="8">
+  <h2>Referral Traffic Dashboard</h2>
+  <table>
     <thead>
       <tr>
-        <th>Friend</th>
-        <th>Visits</th>
+        <th>Name</th>
+        <th>Total Users</th>
+        <th>Active Users</th>
+        <th>Offline Users</th>
+        <th>Fake Users (same IP)</th>
       </tr>
     </thead>
-    <tbody id="refTable"></tbody>
+    <tbody id="dashboard">
+      <tr><td colspan="5">Loading...</td></tr>
+    </tbody>
   </table>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  <script>
+    // 🔹 Firebase Config (replace with your real config)
+  const firebaseConfig = {
+  apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
+  authDomain: "adwatchrewardsapp.firebaseapp.com",
+  projectId: "adwatchrewardsapp",
+  storageBucket: "adwatchrewardsapp.firebasestorage.app",
+  messagingSenderId: "782268735936",
+  appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
+  measurementId: "G-4NG2564HTK"
+};
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-    
-    // ✅ Your Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
-      authDomain: "adwatchrewardsapp.firebaseapp.com",
-      projectId: "adwatchrewardsapp",
-      storageBucket: "adwatchrewardsapp.firebasestorage.app",
-      messagingSenderId: "782268735936",
-      appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
-      measurementId: "G-4NG2564HTK"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    async function loadStats() {
-      const querySnap = await getDocs(collection(db, "referrals"));
-      const table = document.getElementById("refTable");
+    // 🔹 Fetch referral stats
+    async function loadDashboard() {
+      const table = document.getElementById("dashboard");
       table.innerHTML = "";
 
-      querySnap.forEach((doc) => {
-        const row = `<tr><td>${doc.id}</td><td>${doc.data().count}</td></tr>`;
+      const snapshot = await db.collection("users").get();
+      const userStats = {};
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const inviter = data.invitedBy || "Unknown";
+        const ip = data.ip || "no-ip";
+        const lastActive = data.lastActive ? data.lastActive.toDate() : null;
+
+        if (!userStats[inviter]) {
+          userStats[inviter] = {
+            total: 0,
+            active: 0,
+            offline: 0,
+            ips: {}
+          };
+        }
+
+        userStats[inviter].total++;
+
+        // Fake check (same IP)
+        if (!userStats[inviter].ips[ip]) {
+          userStats[inviter].ips[ip] = 0;
+        }
+        userStats[inviter].ips[ip]++;
+
+        // Active/offline logic (active in last 24h = active)
+        if (lastActive && (Date.now() - lastActive.getTime()) < (24 * 60 * 60 * 1000)) {
+          userStats[inviter].active++;
+        } else {
+          userStats[inviter].offline++;
+        }
+      });
+
+      // Render rows
+      Object.keys(userStats).forEach(name => {
+        const stat = userStats[name];
+        const fake = Object.values(stat.ips).reduce((acc, n) => acc + (n > 1 ? n - 1 : 0), 0);
+
+        const row = `
+          <tr>
+            <td>${name}</td>
+            <td>${stat.total}</td>
+            <td>${stat.active}</td>
+            <td>${stat.offline}</td>
+            <td>${fake}</td>
+          </tr>
+        `;
         table.innerHTML += row;
       });
+
+      if (!Object.keys(userStats).length) {
+        table.innerHTML = `<tr><td colspan="5">No Data Found</td></tr>`;
+      }
     }
 
-    loadStats();
+    loadDashboard();
   </script>
 </body>
 </html>
