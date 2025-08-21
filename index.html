@@ -2754,22 +2754,66 @@
         });
     </script>
 //TREAKCER
+
+
+
+
+
+    <!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Admin — Referral Engagement Dashboard</title>
+  <meta name="robots" content="noindex">
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;background:#f6f7fb;margin:0;padding:24px}
+    .wrap{max-width:1100px;margin:0 auto}
+    h1{margin:0 0 12px}
+    .bar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    input,button{padding:8px 10px;border-radius:8px;border:1px solid #ddd}
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 6px 18px rgba(20,20,40,.06)}
+    th,td{padding:10px;border-bottom:1px solid #eee;text-align:center}
+    th{background:#f0f6ff}
+    tr:last-child td{border-bottom:0}
+    .small{font-size:12px;color:#666}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Referral Engagement Dashboard</h1>
+  <div class="bar small">
+    <span><b>Tip:</b> Active = last visit in the past 24 hours. Fake = duplicate IP accounts.</span>
+    <span style="margin-left:auto">Auto-refresh <input type="checkbox" id="auto"> every 10s</span>
+    <button id="refresh">Refresh</button>
+    <button id="export">Export CSV</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>USERS</th>
+        <th>Active Users (24h)</th>
+        <th>Offline Users</th>
+        <th>Fake Users (same IP)</th>
+      </tr>
+    </thead>
+    <tbody id="rows">
+      <tr><td colspan="5">Loading…</td></tr>
+    </tbody>
+  </table>
+
+  <p class="small" style="margin-top:8px">
+    Source collections: <code>users</code> (one per browser/client) and <code>visitLogs</code> (optional).<br>
+    Security note: anyone who knows this URL can view it unless you protect it (ask me to add a simple key/password).
+  </p>
+</div>
+
 <script type="module">
-/**
- * ADVANCED REFERRAL + USER ANALYTICS (no auth, static site friendly)
- * - Identifies each visitor with a clientId in localStorage
- * - Stores a "user" document on first visit (signup) with IP + referredBy
- * - Updates lastActive on every visit
- * - Admin dashboard aggregates: USERS, Active (24h), Offline, Fake (duplicate IPs)
- */
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import {
-  getFirestore, doc, getDoc, setDoc, updateDoc,
-  serverTimestamp, collection, addDoc
-} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { getFirestore, collection, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-// 🔑 Your Firebase config (yours, unchanged)
+// 🔑 same config
 const firebaseConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
@@ -2779,91 +2823,98 @@ const firebaseConfig = {
   appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
   measurementId: "G-4NG2564HTK"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- helpers ---
-function uuid() {
-  return ([1e7]+-1e3+-4e3+-8e3+-1e11)
-    .replace(/[018]/g, c =>
-      (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-    );
-}
-function todayYMD() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const dd = String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${dd}`;
+const rows = document.getElementById("rows");
+const btn = document.getElementById("refresh");
+const exp = document.getElementById("export");
+const auto = document.getElementById("auto");
+let timer = null;
+
+function isActiveIn24h(lastActiveTs) {
+  if (!lastActiveTs) return false;
+  const last = lastActiveTs instanceof Timestamp ? lastActiveTs.toDate() : new Date(lastActiveTs);
+  return (Date.now() - last.getTime()) < 24*60*60*1000; // 24h
 }
 
-// --- identify this browser as a unique "user" ---
-let clientId = localStorage.getItem("clientId");
-if (!clientId) {
-  clientId = uuid();
-  localStorage.setItem("clientId", clientId);
-}
+async function load() {
+  rows.innerHTML = "<tr><td colspan='5'>Loading…</td></tr>";
 
-// --- get referral param (fixed once at signup) ---
-const params = new URLSearchParams(window.location.search);
-const refRaw = params.get("ref");
-const referredBy = refRaw ? String(refRaw).trim() : null;
+  const snap = await getDocs(collection(db, "users"));
+  const byRef = new Map(); // referredBy -> { total, active, offline, ipCounts: Map }
 
-// --- get IP (for fake-user detection). If fetch fails, store 'unknown' ---
-async function getIP() {
-  try {
-    const r = await fetch("https://api.ipify.org?format=json", { cache: "no-store" });
-    const j = await r.json();
-    return j.ip || "unknown";
-  } catch {
-    return "unknown";
+  snap.forEach(docSnap => {
+    const u = docSnap.data();
+    const nameRaw = (u.referredBy || "direct").toString();
+    const name = nameRaw.trim();
+    const ip = (u.ip || "unknown").toString();
+    const active = isActiveIn24h(u.lastActive);
+
+    if (!byRef.has(name)) {
+      byRef.set(name, { total:0, active:0, offline:0, ipCounts: new Map() });
+    }
+    const bucket = byRef.get(name);
+    bucket.total += 1;
+    if (active) bucket.active += 1; else bucket.offline += 1;
+
+    // IP counting for "fake"
+    const v = (bucket.ipCounts.get(ip) || 0) + 1;
+    bucket.ipCounts.set(ip, v);
+  });
+
+  // Render
+  const arr = Array.from(byRef.entries()).sort((a,b)=> b[1].total - a[1].total);
+  if (arr.length === 0) {
+    rows.innerHTML = "<tr><td colspan='5'>No users found.</td></tr>";
+    return;
   }
+
+  let html = "";
+  arr.forEach(([name, stats]) => {
+    const fake = Array.from(stats.ipCounts.values())
+      .reduce((sum,n)=> sum + (n>1 ? (n-1) : 0), 0);
+    html += `<tr>
+      <td>${name}</td>
+      <td>${stats.total}</td>
+      <td>${stats.active}</td>
+      <td>${stats.offline}</td>
+      <td>${fake}</td>
+    </tr>`;
+  });
+  rows.innerHTML = html;
 }
 
-(async function trackUser() {
-  const ip = await getIP();
-  const usersCol = collection(db, "users");
-  const userRef = doc(db, "users", clientId);
-  const snap = await getDoc(userRef);
-  const now = new Date();
-  const today = todayYMD();
+btn.addEventListener("click", load);
 
-  if (!snap.exists()) {
-    // First time we see this browser: create user “account”
-    await setDoc(userRef, {
-      referredBy: referredBy || "direct",
-      ip: ip,
-      signupAt: serverTimestamp(),
-      lastActive: serverTimestamp(),
-      lastActiveYMD: today,
-      visits: 1
-    });
-
-    // Optional: log a visit record (helps extra analytics later)
-    await addDoc(collection(db, "visitLogs"), {
-      clientId, referredBy: referredBy || "direct", ip, when: serverTimestamp(), ymd: today
-    });
+auto.addEventListener("change", ()=>{
+  if (auto.checked) {
+    timer = setInterval(load, 10000);
   } else {
-    // Repeat visitor: update lastActive and increment visits
-    const data = snap.data();
-    // lock referredBy forever on first set (don’t let new ?ref overwrite)
-    const refFixed = data.referredBy || referredBy || "direct";
-
-    await updateDoc(userRef, {
-      lastActive: serverTimestamp(),
-      lastActiveYMD: today,
-      visits: (data.visits || 0) + 1,
-      referredBy: refFixed,
-      ip: data.ip || ip // keep stored IP, or set if missing
-    });
-
-    await addDoc(collection(db, "visitLogs"), {
-      clientId, referredBy: refFixed, ip: data.ip || ip, when: serverTimestamp(), ymd: today
-    });
+    clearInterval(timer); timer = null;
   }
-})();
+});
+
+exp.addEventListener("click", ()=>{
+  // Build CSV from current table
+  let csv = "Name,USERS,Active Users,Offline Users,Fake Users\n";
+  const trs = rows.querySelectorAll("tr");
+  trs.forEach(tr=>{
+    const tds = tr.querySelectorAll("td");
+    if (tds.length === 5) {
+      csv += `${tds[0].textContent},${tds[1].textContent},${tds[2].textContent},${tds[3].textContent},${tds[4].textContent}\n`;
+    }
+  });
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = "referral_dashboard.csv"; a.click();
+  URL.revokeObjectURL(url);
+});
+
+load();
 </script>
+</body>
+</html>
 
 
 </body>
