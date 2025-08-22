@@ -2756,13 +2756,15 @@
 //TREAKCER
 
 
-<!-- ================= REFERRAL TRACKER (Advanced) ================= -->
+
+
+
+    <!-- ======= index tracker (paste before </body>) ======= -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import { getFirestore, collection, addDoc, serverTimestamp, query, where, orderBy, limit, getDocs, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-import { getAuth, isSignInWithEmailLink, sendSignInLinkToEmail, signInWithEmailLink } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-// ---------- Firebase ----------
+// ---------- Firebase config (your project) ----------
 const firebaseConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
@@ -2772,144 +2774,56 @@ const firebaseConfig = {
   appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
   measurementId: "G-4NG2564HTK"
 };
-const app  = initializeApp(firebaseConfig);
-const db   = getFirestore(app);
-const auth = getAuth(app);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-// ---------- Helpers ----------
-const qs = new URLSearchParams(location.search);
-const refRaw = (qs.get("ref") || "").trim();
-const referrer = refRaw ? refRaw.toLowerCase() : "";
+// Cloud Function URL you deployed (update this)
+const VALIDATE_URL = "https://us-central1-YOUR_PROJECT.cloudfunctions.net/api/validate";
 
-function sessionKey(r){ return "ref_log_once_"+r; }
-function ipKey(ip,r){ return `rl_${r}_${ip}`; }
+// Helpers
+function getRef(){ return new URLSearchParams(window.location.search).get('ref') || ""; }
+function onceKey(ref){ return `ref_once_${ref}`; }
 
-// map country => CPM region score
-function regionScore(country){
-  const c = (country||"").toLowerCase();
-  if(["united states","usa","canada","united kingdom","uk","england","scotland","wales","northern ireland"].includes(c)) return 500;
-  if(["germany","france","italy","spain","netherlands","sweden","norway","denmark","finland","belgium","switzerland","austria","ireland","portugal","poland","europe"].includes(c)) return 370;
-  if(["united arab emirates","uae","saudi arabia","qatar","kuwait","bahrain","oman","middle east"].includes(c)) return 350;
-  return 130; // asia/others default
-}
+// main
+(async function(){
+  const refRaw = getRef();
+  if(!refRaw) return;
+  const ref = refRaw.trim().toLowerCase();
 
-async function getVisitor(){
-  try{
-    const r = await fetch("https://ipapi.co/json/");
-    const j = await r.json();
-    return {
-      ip: j.ip || "",
-      country: j.country_name || "",
-      city: j.city || "",
-      region: j.region || "",
-      lat: j.latitude || null,
-      lon: j.longitude || null
-    };
-  }catch(e){
-    return { ip:"", country:"", city:"", region:"", lat:null, lon:null };
-  }
-}
+  // prevent duplicate write in same session/tab
+  if(sessionStorage.getItem(onceKey(ref))) return;
+  sessionStorage.setItem(onceKey(ref), "1");
 
-// ---------- Email Link completion (verification) ----------
-(async function maybeCompleteEmailLink(){
-  if(!isSignInWithEmailLink(auth, window.location.href)) return;
-  let email = window.localStorage.getItem("emailForSignIn");
-  if(!email){
-    email = prompt("Confirm your email to complete verification:");
-    if(!email) return;
-  }
-  try{
-    await signInWithEmailLink(auth, email, window.location.href);
-    window.localStorage.removeItem("emailForSignIn");
+  // optional email capture: auto-read any input on page
+  const emailInput = document.querySelector('input[type="email"], input[name="email"], #email');
+  const email = emailInput ? (emailInput.value || "") : "";
 
-    // Mark latest visit for this email as verified
-    if(referrer){
-      const q = query(
-        collection(db,"referrals"),
-        where("referrer","==",referrer),
-        where("email","==",email),
-        orderBy("ts","desc"),
-        limit(1)
-      );
-      const snap = await getDocs(q);
-      if(!snap.empty){
-        const d = snap.docs[0];
-        await updateDoc(doc(db,"referrals", d.id), { verified:true });
-      }
-      alert("Email verified! Thanks.");
-    }
-  }catch(err){
-    console.error(err);
-    alert("Email verification failed.");
-  }
-})();
-
-// ---------- Main tracking ----------
-(async function track(){
-  if(!referrer) return;                      // only track if ?ref=
-  if(sessionStorage.getItem(sessionKey(referrer))) return; // same-tab refresh guard
-
-  const visitor = await getVisitor();
-
-  // IP rate-limit (10 minutes per IP per referrer)
-  const now = Date.now();
-  const rlKey = ipKey(visitor.ip||"unknown", referrer);
-  const last = Number(localStorage.getItem(rlKey) || "0");
-  const TEN_MIN = 10*60*1000;
-  if(now - last < TEN_MIN) return; // block repeated hits from same IP quickly
-  localStorage.setItem(rlKey, String(now));
-
-  // optional visitor email (use your site form if you have one)
-  let email = "";
-  const input = document.querySelector('input[type="email"], input[name="email"], #email');
-  if(input && input.value) email = (input.value || "").trim();
-
-  // Ask for email if not present (optional UX)
-  // email ||= prompt("Enter your email to join (optional):") || "";
-
-  // compute base+region score
-  const base = 10;
-  const rScore = regionScore(visitor.country);
-  const score = base + rScore;
-
-  // create visit doc
-  const docRef = await addDoc(collection(db,"referrals"),{
-    referrer,
+  // create provisional doc first (no ip)
+  const docRef = await addDoc(collection(db,'referrals'), {
+    referrer: ref,
     referrerRaw: refRaw,
     email: email || "N/A",
-    verified: false,           // flips to true when email link completes
-    ip: visitor.ip,
-    country: visitor.country,
-    city: visitor.city,
-    region: visitor.region,
-    lat: visitor.lat,
-    lon: visitor.lon,
     ua: navigator.userAgent,
-    score,
-    ts: serverTimestamp()
+    ts: serverTimestamp(),
+    // server will fill: ip, country, lat, lon, verified, score, server_ts
   });
 
-  // If user entered an email, offer verification link
-  if(email && email !== "N/A"){
-    try{
-      const actionCodeSettings = {
-        url: `${location.origin}${location.pathname}?ref=${encodeURIComponent(refRaw)}`, // return to same page
-        handleCodeInApp: true
-      };
-      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-      window.localStorage.setItem("emailForSignIn", email);
-      // Optional toast
-      // alert("We sent a verification link to your email. Please open it to get verified.");
-    }catch(err){
-      console.warn("Could not send email link:", err.message);
-    }
+  // call server to validate (server reads client IP from request)
+  try{
+    await fetch(VALIDATE_URL, {
+      method: "POST",
+      headers: { "Content-Type":"application/json" },
+      body: JSON.stringify({ docId: docRef.id })
+    });
+    // no need to rely on response: admin dashboard listens to Firestore updates
+  }catch(err){
+    console.warn("Server validation call failed:", err);
   }
-
-  sessionStorage.setItem(sessionKey(referrer),"1");
 })();
 </script>
-<!-- ================= END REFERRAL TRACKER ================= -->
->
+<!-- ======= end tracker ======= -->
+
+    
 
 </body>
 </html>
