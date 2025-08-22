@@ -2757,12 +2757,20 @@
 
 
 
-
-
-    <!-- ======= index tracker (paste before </body>) ======= -->
+<!-- ===== Referral tracker (paste at end of <body>) ===== -->
 <script type="module">
+/*
+  Lightweight tracker:
+  - writes provisional doc to Firestore collection "referrals"
+  - calls VERIFY URL (Cloud Function) to let server read real client IP and write authoritative geo/score/verified
+  - respects session + IP rate-limit
+  - reads optional email input on page (if present)
+  Replace VALIDATE_URL with your deployed Cloud Function endpoint.
+*/
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { getAuth, isSignInWithEmailLink, sendSignInLinkToEmail, signInWithEmailLink } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 
 // ---------- Firebase config (your project) ----------
 const firebaseConfig = {
@@ -2774,54 +2782,98 @@ const firebaseConfig = {
   appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
   measurementId: "G-4NG2564HTK"
 };
+
+// Initialize
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-// Cloud Function URL you deployed (update this)
-const VALIDATE_URL = "https://us-central1-YOUR_PROJECT.cloudfunctions.net/api/validate";
+// Replace with your deployed function URL after you deploy it
+const VALIDATE_URL = "https://us-central1-YOUR_PROJECT.cloudfunctions.net/api/validate"; // <- REPLACE
 
-// Helpers
-function getRef(){ return new URLSearchParams(window.location.search).get('ref') || ""; }
-function onceKey(ref){ return `ref_once_${ref}`; }
+// helpers
+const query = new URLSearchParams(location.search);
+const refRaw = (query.get('ref') || "").trim();
+const ref = refRaw ? refRaw.toLowerCase() : "";
+const SESSION_KEY = (r) => `ref_session_${r}`;
+const IP_KEY = (r, ip) => `ref_ip_${r}_${ip}`;
+const RATE_MS = 10*60*1000; // 10 minutes
+
+// handle email link sign-in completion (if you use email verification)
+(async function completeEmailLink(){
+  try{
+    if(isSignInWithEmailLink(auth, window.location.href)){
+      let email = window.localStorage.getItem('emailForSignIn');
+      if(!email) email = prompt("Confirm email to finish verification:");
+      if(!email) return;
+      await signInWithEmailLink(auth, email, window.location.href);
+      window.localStorage.removeItem('emailForSignIn');
+      console.log("Email verification completed.");
+    }
+  }catch(e){ console.warn("Email link completion error:", e); }
+})();
+
+async function createProvisionalDoc(data){
+  return await addDoc(collection(db,'referrals'), data);
+}
 
 // main
-(async function(){
-  const refRaw = getRef();
-  if(!refRaw) return;
-  const ref = refRaw.trim().toLowerCase();
+(async function track(){
+  if(!ref) return;
+  // session guard to avoid double log on refresh
+  if(sessionStorage.getItem(SESSION_KEY(ref))) return;
+  sessionStorage.setItem(SESSION_KEY(ref), "1");
 
-  // prevent duplicate write in same session/tab
-  if(sessionStorage.getItem(onceKey(ref))) return;
-  sessionStorage.setItem(onceKey(ref), "1");
-
-  // optional email capture: auto-read any input on page
+  // optional email entry on page (non-blocking)
+  let email = "";
   const emailInput = document.querySelector('input[type="email"], input[name="email"], #email');
-  const email = emailInput ? (emailInput.value || "") : "";
+  if(emailInput && emailInput.value) email = (emailInput.value || "").trim();
 
-  // create provisional doc first (no ip)
-  const docRef = await addDoc(collection(db,'referrals'), {
-    referrer: ref,
-    referrerRaw: refRaw,
-    email: email || "N/A",
-    ua: navigator.userAgent,
-    ts: serverTimestamp(),
-    // server will fill: ip, country, lat, lon, verified, score, server_ts
-  });
+  // create provisional doc (server will fill ip/country/lat/lon/verified/score later)
+  let docRef;
+  try{
+    docRef = await createProvisionalDoc({
+      referrer: ref,
+      referrerRaw: refRaw,
+      email: email || "N/A",
+      verified: false,
+      ua: navigator.userAgent || "",
+      ts: serverTimestamp()
+    });
+  }catch(err){
+    console.error("Failed to write provisional doc:", err);
+    return;
+  }
 
-  // call server to validate (server reads client IP from request)
+  // call server to validate (server reads client IP and updates the doc)
   try{
     await fetch(VALIDATE_URL, {
       method: "POST",
-      headers: { "Content-Type":"application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ docId: docRef.id })
     });
-    // no need to rely on response: admin dashboard listens to Firestore updates
+    // Admin listens to Firestore — updated doc will appear there
   }catch(err){
-    console.warn("Server validation call failed:", err);
+    console.warn("Server validation call failed (replace VALIDATE_URL after deploying function):", err);
+  }
+
+  // if email present, optionally send magic link (requires Email Link enabled in Firebase Auth)
+  if(email){
+    try{
+      const actionCodeSettings = {
+        url: `${location.origin}${location.pathname}?ref=${encodeURIComponent(refRaw)}`,
+        handleCodeInApp: true
+      };
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+      window.localStorage.setItem('emailForSignIn', email);
+      console.log("Verification link sent to:", email);
+    }catch(e){
+      console.warn("Could not send verification link:", e);
+    }
   }
 })();
 </script>
-<!-- ======= end tracker ======= -->
+<!-- ===== end tracker ===== -->
 
     
 
