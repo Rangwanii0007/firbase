@@ -1,30 +1,91 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
 <head>
-<meta charset="utf-8"/>
-<title>Affiliate Admin Dashboard</title>
-<style>
-  body{font-family:Arial,sans-serif;background:#f0f2f7;margin:0;padding:0}
-  .card{max-width:1000px;margin:30px auto;background:#fff;padding:20px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,0.08)}
-  table{width:100%;border-collapse:collapse;margin-top:12px}
-  th,td{padding:10px;border:1px solid #ddd;text-align:center}
-  th{background:#f5f7fa;color:#333}
-  .badge{padding:4px 8px;border-radius:6px;color:#fff;font-size:12px}
-  .badge1{background:#ff4d4d} .badge2{background:#ff944d} .badge3{background:#ffdb4d} .badge4{background:#4dff88} .badge5{background:#4dd2ff}
-  button{padding:6px 10px;border-radius:6px;border:none;background:#4d79ff;color:#fff;cursor:pointer}
-  #search{margin:10px 0;padding:6px;width:200px;border-radius:6px;border:1px solid #ccc}
-</style>
+  <meta charset="utf-8"/>
+  <title>Affiliate Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    :root{
+      --bg:#0f172a; --card:#0b1220; --muted:#94a3b8; --text:#e2e8f0; --acc:#60a5fa; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+    }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Arial}
+    .wrap{max-width:1200px;margin:32px auto;padding:0 16px}
+    .card{background:linear-gradient(180deg,#0c172d, #0b1220);border:1px solid #1f2a44;border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,.4);padding:18px}
+    h1{margin:0 0 8px;font-weight:800;letter-spacing:.2px}
+    .sub{color:var(--muted);font-size:14px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+    input,select,button{border-radius:10px;border:1px solid #1e293b;background:#0b1324;color:var(--text);padding:8px 10px}
+    button{cursor:pointer}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{padding:10px;border-bottom:1px solid #1e293b;text-align:center}
+    thead th{position:sticky;top:0;background:#0d1730}
+    .badge{padding:3px 8px;border-radius:999px;font-size:12px;color:#00111a;background:#60a5fa}
+    .b1{background:#ffd54a;color:#2b1a00}.b2{background:#94e06a;color:#082100}.b3{background:#69c0ff;color:#001a2b}
+    .pill{padding:3px 8px;border-radius:8px;font-size:12px}
+    .ok{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.25)}
+    .warn{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.25)}
+    .bad{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.25)}
+    .right{margin-left:auto}
+    .muted{color:var(--muted)}
+    dialog{border:none;border-radius:14px;max-width:920px;width:90%;background:#0b1220;color:var(--text);padding:0}
+    .dlg-head{padding:12px 16px;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:8px}
+    .dlg-body{padding:14px 16px;max-height:70vh;overflow:auto}
+    .x{margin-left:auto}
+  </style>
 </head>
 <body>
+<div class="wrap">
+  <div class="card" id="login">
+    <h1>Admin Login</h1>
+    <div class="sub">Enter your credentials to open the live dashboard.</div>
+    <div class="row">
+      <input id="user" placeholder="Username" value="admin"/>
+      <input id="pass" placeholder="Password" type="password"/>
+      <button id="go">Login</button>
+    </div>
+    <div class="sub">Hint: admin / nadeem</div>
+  </div>
+
+  <div class="card" id="dash" style="display:none">
+    <h1>Affiliate Leaderboard (Realtime)</h1>
+    <div class="sub">Active = last 24h · Fake = duplicate accounts from same IP · Sorted by CPM score.</div>
+    <div class="row">
+      <input id="search" placeholder="Search name…">
+      <label class="right muted">Auto refresh is realtime (snapshot)</label>
+      <button id="csv" class="right">Export CSV</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Rank</th><th>Name</th><th>Gmail</th><th>Total Users</th><th>Active (24h)</th><th>Offline</th><th>Fake (same IP)</th><th>Active %</th><th>Total Score</th><th>Details</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"><tr><td colspan="10" class="muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<dialog id="details">
+  <div class="dlg-head">
+    <strong id="dlgTitle">Details</strong>
+    <button class="x" id="dlgClose">Close</button>
+  </div>
+  <div class="dlg-body">
+    <div class="sub" id="countrySummary"></div>
+    <table>
+      <thead>
+        <tr><th>Email</th><th>Country</th><th>IP</th><th>When</th><th>Active</th><th>Fake</th></tr>
+      </thead>
+      <tbody id="dlgBody"></tbody>
+    </table>
+  </div>
+</dialog>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-// --- Password Protection ---
-const password = prompt("Enter Admin Password:");
-if(password !== "nadeem"){ alert("Wrong password"); throw new Error("Unauthorized"); }
-
-// ----- Firebase Config -----
+// --- Firebase ---
 const firebaseConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
@@ -37,80 +98,178 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- HTML Elements ---
-document.body.innerHTML = `<div class="card">
-  <h2>Affiliate Leaderboard (Realtime)</h2>
-  <input type="text" id="search" placeholder="Search name...">
-  <table id="tbl">
-    <thead>
+// --- UI refs ---
+const login = document.getElementById('login');
+const dash  = document.getElementById('dash');
+const go    = document.getElementById('go');
+const user  = document.getElementById('user');
+const pass  = document.getElementById('pass');
+const tbody = document.getElementById('tbody');
+const search= document.getElementById('search');
+const csvBtn= document.getElementById('csv');
+const dlg   = document.getElementById('details');
+const dlgBody = document.getElementById('dlgBody');
+const dlgClose= document.getElementById('dlgClose');
+const dlgTitle= document.getElementById('dlgTitle');
+const countrySummary = document.getElementById('countrySummary');
+
+go.onclick = ()=>{
+  if(user.value.trim()==="admin" && pass.value.trim()==="nadeem"){
+    login.style.display="none";
+    dash.style.display="block";
+    startLive();
+  } else {
+    alert("Wrong credentials");
+  }
+};
+dlgClose.onclick = ()=> dlg.close();
+
+// --- Scoring ---
+function regionScore(country){
+  const c = (country||"").toLowerCase();
+  if(["united states","usa","canada","united kingdom","uk","england","scotland","wales","northern ireland"].includes(c)) return 500;
+  if(["germany","france","italy","spain","netherlands","sweden","norway","denmark","finland","belgium","switzerland","austria","ireland","portugal","poland","europe"].includes(c)) return 370;
+  if(["united arab emirates","uae","saudi arabia","qatar","kuwait","bahrain","oman","middle east"].includes(c)) return 350;
+  return 130; // Asia/others default
+}
+
+// --- Live snapshot & render ---
+let allDocs = [];
+function startLive(){
+  onSnapshot(collection(db,"referrals"), (snap)=>{
+    allDocs = snap.docs.map(d=>d.data());
+    render();
+  });
+}
+
+function computeAgg(){
+  // Group by referrer
+  const byRef = {};
+  for(const d of allDocs){
+    const name = (d.referrer || "unknown").toLowerCase();
+    if(!byRef[name]) byRef[name] = { name, email:"N/A", visits:[] };
+    if(d.email && byRef[name].email==="N/A") byRef[name].email = d.email; // first seen email as "gmail"
+    byRef[name].visits.push(d);
+  }
+
+  // Build rows with stats
+  const rows = [];
+  const now = Date.now();
+
+  Object.values(byRef).forEach(ref=>{
+    const ipCounts = {};
+    let total=0, active=0, offline=0, fake=0, score=0;
+    const countries = {};
+
+    ref.visits.forEach(v=>{
+      total++;
+      const tsMs = v.ts?.toDate ? v.ts.toDate().getTime() : (v.ts ? new Date(v.ts).getTime() : now);
+      const isActive = (now - tsMs) <= 24*60*60*1000;
+      if(isActive) active++; else offline++;
+
+      const ip = v.ip || "";
+      ipCounts[ip] = (ipCounts[ip]||0)+1;
+
+      const ctry = v.country || "Unknown";
+      countries[ctry] = (countries[ctry]||0)+1;
+
+      score += (10 + regionScore(ctry));
+    });
+
+    // fake = sum over IPs of (count-1) where count>1
+    Object.values(ipCounts).forEach(n => { if(n>1) fake += (n-1); });
+
+    const activePct = total ? Math.round((active/total)*100) : 0;
+    rows.push({
+      name: ref.name,
+      email: ref.email,
+      total, active, offline, fake,
+      activePct,
+      score,
+      visits: ref.visits,
+      countries
+    });
+  });
+
+  // sort by score desc
+  rows.sort((a,b)=> b.score - a.score);
+  return rows;
+}
+
+function render(){
+  const rows = computeAgg();
+  const q = (search.value||"").toLowerCase();
+  const filtered = rows.filter(r=> r.name.includes(q));
+
+  if(filtered.length===0){
+    tbody.innerHTML = `<tr><td class="muted" colspan="10">No data</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((r,idx)=>{
+    const badge = idx===0?'<span class="badge b1">TOP 1</span>': idx===1?'<span class="badge b2">TOP 2</span>': idx===2?'<span class="badge b3">TOP 3</span>':'';
+    const actClass = r.activePct>=60?'pill ok': r.activePct>=30?'pill warn':'pill bad';
+    return `
       <tr>
-        <th>Rank</th><th>Name</th><th>Email</th><th>Total Invites</th><th>Active (24h)</th><th>Offline</th><th>Fake</th><th>Active %</th><th>Total Score</th><th>Details</th>
-      </tr>
-    </thead>
-    <tbody id="tBody"><tr><td colspan="10">Loading…</td></tr></tbody>
-  </table>
-</div>`;
-
-const tBody = document.getElementById("tBody");
-const searchInput = document.getElementById("search");
-
-function calculateStats(refName, docs){
-  const totalInvites = docs.length;
-  const now = new Date();
-  let active = 0, offline = 0, fake = 0, totalScore=0;
-  docs.forEach(d=>{
-    const ts = new Date(d.timestamp);
-    if((now - ts)/1000/60/60 < 24) active++;
-    else offline++;
-    if(d.fake) fake++;
-    totalScore += Number(d.score || 0);
-  });
-  const activePercent = totalInvites? Math.round((active/totalInvites)*100):0;
-  return {totalInvites, active, offline, fake, activePercent, totalScore};
-}
-
-// --- Load leaderboard ---
-function loadLeaderboard(){
-  onSnapshot(collection(db,"referrals"), snapshot=>{
-    const data = {};
-    snapshot.docs.forEach(d=>{
-      const doc = d.data();
-      const name = doc.refName || "unknown";
-      if(!data[name]) data[name]=[];
-      data[name].push(doc);
-    });
-
-    // Convert to array & sort by totalScore
-    const leaderboard = Object.entries(data).map(([name, docs])=>{
-      const stats = calculateStats(name, docs);
-      return {name, email:docs[0].email || 'N/A', ...stats, docs};
-    });
-    leaderboard.sort((a,b)=>b.totalScore - a.totalScore);
-
-    // Render table
-    let html = "";
-    leaderboard.forEach((u,i)=>{
-      const badge = i<3?`<span class="badge badge${i+1}">TOP ${i+1}</span>`:"";
-      html+=`<tr>
-        <td>${i+1} ${badge}</td>
-        <td>${u.name}</td>
-        <td>${u.email}</td>
-        <td>${u.totalInvites}</td>
-        <td>${u.active}</td>
-        <td>${u.offline}</td>
-        <td>${u.fake}</td>
-        <td>${u.activePercent}%</td>
-        <td>${u.totalScore}</td>
-        <td><button onclick='alert(JSON.stringify(${JSON.stringify(u.docs)},null,2))'>Details</button></td>
+        <td>${idx+1} ${badge}</td>
+        <td>${r.name.toUpperCase()}</td>
+        <td>${r.email}</td>
+        <td>${r.total}</td>
+        <td>${r.active}</td>
+        <td>${r.offline}</td>
+        <td>${r.fake}</td>
+        <td><span class="${actClass}">${r.activePct}%</span></td>
+        <td>${r.score}</td>
+        <td><button data-name="${r.name}" class="details">Details</button></td>
       </tr>`;
-    });
-    tBody.innerHTML = html;
+  }).join("");
+
+  // attach details
+  document.querySelectorAll("button.details").forEach(btn=>{
+    btn.onclick = ()=>{
+      const name = btn.dataset.name;
+      const r = rows.find(x=>x.name===name);
+      if(!r) return;
+      dlgTitle.textContent = `Details — ${name.toUpperCase()}`;
+      // country summary
+      const parts = Object.entries(r.countries).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`${c}: ${n}`).join(" · ");
+      countrySummary.textContent = parts ? `Countries: ${parts}` : "Countries: N/A";
+      // rows
+      dlgBody.innerHTML = r.visits.map(v=>{
+        const ts = v.ts?.toDate ? v.ts.toDate() : (v.ts ? new Date(v.ts) : new Date());
+        const isActive = (Date.now() - ts.getTime()) <= 24*60*60*1000;
+        // fake mark is recomputed in table by IP duplication; per-visit we show "—" (could be improved if needed)
+        return `<tr>
+          <td>${v.email || "N/A"}</td>
+          <td>${v.country || "Unknown"}</td>
+          <td>${v.ip || "N/A"}</td>
+          <td>${ts.toLocaleString()}</td>
+          <td>${isActive ? "Yes" : "No"}</td>
+          <td>${"—"}</td>
+        </tr>`;
+      }).join("");
+      dlg.showModal();
+    };
   });
 }
 
-searchInput.addEventListener("input", ()=> loadLeaderboard());
+search.addEventListener("input", render);
 
-loadLeaderboard();
+// CSV export
+csvBtn.onclick = ()=>{
+  const rows = computeAgg();
+  let csv = "Rank,Name,Gmail,Total Users,Active (24h),Offline,Fake (same IP),Active %,Total Score\n";
+  rows.forEach((r,i)=>{
+    csv += [
+      i+1, r.name, r.email, r.total, r.active, r.offline, r.fake, r.activePct+"%", r.score
+    ].join(",") + "\n";
+  });
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "affiliate_leaderboard.csv"; a.click();
+  URL.revokeObjectURL(url);
+};
 </script>
 </body>
 </html>
