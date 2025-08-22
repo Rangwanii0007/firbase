@@ -2,81 +2,96 @@
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>Affiliate Admin Dashboard</title>
+  <title>Hacker Affiliate Dashboard</title>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <!-- Globe + Chart -->
+  <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/globe.gl"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root{
-      --bg:#0f172a; --card:#0b1220; --muted:#94a3b8; --text:#e2e8f0; --acc:#60a5fa; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+      --bg:#00050a; --panel:#021217; --grid:#06282e; --neon:#00ff88; --neon2:#39ff14; --muted:#78b3a3; --accent:#12e3ff; --bad:#ff4d4d; --warn:#ffd166; --ok:#50fa7b;
     }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Arial}
-    .wrap{max-width:1200px;margin:32px auto;padding:0 16px}
-    .card{background:linear-gradient(180deg,#0c172d, #0b1220);border:1px solid #1f2a44;border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,.4);padding:18px}
-    h1{margin:0 0 8px;font-weight:800;letter-spacing:.2px}
-    .sub{color:var(--muted);font-size:14px}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
-    input,select,button{border-radius:10px;border:1px solid #1e293b;background:#0b1324;color:var(--text);padding:8px 10px}
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:#d7fff1;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Courier New",monospace}
+    .wrap{max-width:1400px;margin:16px auto;padding:0 12px}
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}
+    .card{background:linear-gradient(180deg,#001015,#001a22);border:1px solid var(--grid);border-radius:14px;box-shadow:0 0 24px rgba(0,255,136,.05);padding:12px}
+    .title{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.6px}
+    .title .dot{width:8px;height:8px;border-radius:50%;background:var(--neon);box-shadow:0 0 12px var(--neon)}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    input,button{background:#00161d;border:1px solid #07343d;color:#bffff0;border-radius:10px;padding:8px 10px}
     button{cursor:pointer}
-    table{width:100%;border-collapse:collapse;margin-top:12px}
-    th,td{padding:10px;border-bottom:1px solid #1e293b;text-align:center}
-    thead th{position:sticky;top:0;background:#0d1730}
-    .badge{padding:3px 8px;border-radius:999px;font-size:12px;color:#00111a;background:#60a5fa}
-    .b1{background:#ffd54a;color:#2b1a00}.b2{background:#94e06a;color:#082100}.b3{background:#69c0ff;color:#001a2b}
-    .pill{padding:3px 8px;border-radius:8px;font-size:12px}
-    .ok{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.25)}
-    .warn{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.25)}
-    .bad{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.25)}
-    .right{margin-left:auto}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{padding:8px;border-bottom:1px solid #07343d;text-align:center}
+    thead th{position:sticky;top:0;background:#00161d;border-bottom:1px solid #0a3a45}
+    .badge{padding:3px 8px;border-radius:999px;background:var(--neon);color:#00130e;font-weight:700}
     .muted{color:var(--muted)}
-    dialog{border:none;border-radius:14px;max-width:920px;width:90%;background:#0b1220;color:var(--text);padding:0}
-    .dlg-head{padding:12px 16px;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:8px}
-    .dlg-body{padding:14px 16px;max-height:70vh;overflow:auto}
-    .x{margin-left:auto}
+    .pill{padding:2px 8px;border-radius:8px;border:1px solid #0f3;box-shadow:0 0 10px rgba(0,255,136,.2)}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+    .mini{font-size:12px}
+    .globeWrap{height:460px;border-radius:12px;overflow:hidden}
+    dialog{border:none;border-radius:14px;max-width:1000px;width:92%;background:#00161d;color:#d7fff1}
+    .dlg-h{display:flex;gap:8px;align-items:center;padding:10px;border-bottom:1px solid #07343d}
+    .dlg-b{padding:10px;max-height:70vh;overflow:auto}
   </style>
 </head>
 <body>
 <div class="wrap">
+  <!-- Login -->
   <div class="card" id="login">
-    <h1>Admin Login</h1>
-    <div class="sub">Enter your credentials to open the live dashboard.</div>
-    <div class="row">
-      <input id="user" placeholder="Username" value="admin"/>
-      <input id="pass" placeholder="Password" type="password"/>
-      <button id="go">Login</button>
+    <div class="title"><span class="dot"></span> Secure Admin Access</div>
+    <div class="row" style="margin-top:8px">
+      <input id="u" placeholder="username" value="admin">
+      <input id="p" type="password" placeholder="password">
+      <button id="go">Enter</button>
+      <span class="muted mini">Hint: admin / nadeem</span>
     </div>
-    <div class="sub">Hint: admin / nadeem</div>
   </div>
 
-  <div class="card" id="dash" style="display:none">
-    <h1>Affiliate Leaderboard (Realtime)</h1>
-    <div class="sub">Active = last 24h · Fake = duplicate accounts from same IP · Sorted by CPM score.</div>
-    <div class="row">
-      <input id="search" placeholder="Search name…">
-      <label class="right muted">Auto refresh is realtime (snapshot)</label>
-      <button id="csv" class="right">Export CSV</button>
+  <!-- Dashboard -->
+  <div id="dash" style="display:none">
+    <div class="grid">
+      <div class="card">
+        <div class="title"><span class="dot"></span> Live World Map (joins in realtime)</div>
+        <div id="globe" class="globeWrap"></div>
+        <div class="mini muted">Glowing rings = new visits. Lines show recent burst activity.</div>
+      </div>
+      <div class="card">
+        <div class="title"><span class="dot"></span> CPM Breakdown (selected referrer)</div>
+        <div class="row" style="margin-top:6px">
+          <select id="refPick"></select>
+          <button id="csv">Export CSV</button>
+          <input id="q" placeholder="Search name…" class="right">
+        </div>
+        <canvas id="bar" height="220" style="margin-top:8px"></canvas>
+      </div>
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Rank</th><th>Name</th><th>Gmail</th><th>Total Users</th><th>Active (24h)</th><th>Offline</th><th>Fake (same IP)</th><th>Active %</th><th>Total Score</th><th>Details</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"><tr><td colspan="10" class="muted">Loading…</td></tr></tbody>
-    </table>
+
+    <div class="card" style="margin-top:12px">
+      <div class="title"><span class="dot"></span> Leaderboard (realtime)</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Rank</th><th>Name</th><th>Gmail</th><th>Total</th><th>Active 24h</th><th>Offline</th><th>Fake (same IP)</th><th>Active %</th><th>Score</th><th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="10" class="muted">Listening…</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
-<dialog id="details">
-  <div class="dlg-head">
-    <strong id="dlgTitle">Details</strong>
-    <button class="x" id="dlgClose">Close</button>
+<dialog id="dlg">
+  <div class="dlg-h">
+    <strong id="dlgT">Details</strong>
+    <button id="close" style="margin-left:auto">Close</button>
   </div>
-  <div class="dlg-body">
-    <div class="sub" id="countrySummary"></div>
-    <table>
-      <thead>
-        <tr><th>Email</th><th>Country</th><th>IP</th><th>When</th><th>Active</th><th>Fake</th></tr>
-      </thead>
-      <tbody id="dlgBody"></tbody>
+  <div class="dlg-b">
+    <div class="mini muted" id="sum"></div>
+    <table style="width:100%;border-collapse:collapse;margin-top:8px">
+      <thead><tr><th>Email</th><th>Verified</th><th>Country</th><th>IP</th><th>When</th><th>Active</th></tr></thead>
+      <tbody id="dlgB"></tbody>
     </table>
   </div>
 </dialog>
@@ -85,7 +100,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-// --- Firebase ---
+// ---------- Auth gate ----------
+const go = document.getElementById('go'), u=document.getElementById('u'), p=document.getElementById('p');
+const login = document.getElementById('login'), dash=document.getElementById('dash');
+go.onclick=()=>{ if(u.value.trim()==='admin' && p.value.trim()==='nadeem'){ login.style.display='none'; dash.style.display='block'; boot(); } else alert('Wrong'); };
+
+// ---------- Firebase ----------
 const firebaseConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
@@ -96,180 +116,237 @@ const firebaseConfig = {
   measurementId: "G-4NG2564HTK"
 };
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const db  = getFirestore(app);
 
-// --- UI refs ---
-const login = document.getElementById('login');
-const dash  = document.getElementById('dash');
-const go    = document.getElementById('go');
-const user  = document.getElementById('user');
-const pass  = document.getElementById('pass');
-const tbody = document.getElementById('tbody');
-const search= document.getElementById('search');
-const csvBtn= document.getElementById('csv');
-const dlg   = document.getElementById('details');
-const dlgBody = document.getElementById('dlgBody');
-const dlgClose= document.getElementById('dlgClose');
-const dlgTitle= document.getElementById('dlgTitle');
-const countrySummary = document.getElementById('countrySummary');
-
-go.onclick = ()=>{
-  if(user.value.trim()==="admin" && pass.value.trim()==="nadeem"){
-    login.style.display="none";
-    dash.style.display="block";
-    startLive();
-  } else {
-    alert("Wrong credentials");
-  }
-};
-dlgClose.onclick = ()=> dlg.close();
-
-// --- Scoring ---
+// ---------- Helpers ----------
 function regionScore(country){
   const c = (country||"").toLowerCase();
   if(["united states","usa","canada","united kingdom","uk","england","scotland","wales","northern ireland"].includes(c)) return 500;
   if(["germany","france","italy","spain","netherlands","sweden","norway","denmark","finland","belgium","switzerland","austria","ireland","portugal","poland","europe"].includes(c)) return 370;
   if(["united arab emirates","uae","saudi arabia","qatar","kuwait","bahrain","oman","middle east"].includes(c)) return 350;
-  return 130; // Asia/others default
+  return 130;
+}
+function niceTime(ts){
+  const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : new Date());
+  return d.toLocaleString();
+}
+function isActive24(ts){
+  const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : new Date());
+  return (Date.now() - d.getTime()) <= 24*60*60*1000;
 }
 
-// --- Live snapshot & render ---
-let allDocs = [];
-function startLive(){
-  onSnapshot(collection(db,"referrals"), (snap)=>{
-    allDocs = snap.docs.map(d=>d.data());
-    render();
+// ---------- Globe ----------
+let globe, gInstance;
+function buildGlobe(){
+  if(gInstance) return gInstance;
+  const el = document.getElementById("globe");
+  gInstance = Globe()
+    (el)
+    .globeImageUrl("//unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
+    .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+    .backgroundColor("rgba(0,0,0,0)")
+    .pointsData([])
+    .pointAltitude(0.01)
+    .pointColor(()=>"#39ff14")
+    .ringsData([])
+    .ringColor(()=> (t)=>`rgba(57,255,20,${1-t})`)
+    .ringMaxRadius(3)
+    .ringPropagationSpeed(2)
+    .ringRepeatPeriod(1000);
+  return gInstance;
+}
+function pulse(lat,lon){
+  if(lat==null || lon==null) return;
+  const rings = gInstance.ringsData();
+  rings.push({ lat, lng: lon, maxR:3 });
+  if(rings.length>200) rings.shift();
+  gInstance.ringsData(rings);
+}
+
+// ---------- Charts ----------
+let barChart;
+function updateBarChart(dataset){
+  const ctx = document.getElementById('bar').getContext('2d');
+  const labels = ["Premium (US/CA/UK)", "Europe", "Middle East", "Asia/Other"];
+  const data = [
+    dataset.premium||0,
+    dataset.europe||0,
+    dataset.me||0,
+    dataset.asia||0
+  ];
+  if(barChart){ barChart.data.datasets[0].data = data; barChart.update(); return; }
+  barChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'CPM Score Contribution', data }] },
+    options: {
+      plugins:{ legend:{labels:{color:'#bffff0'}} },
+      scales:{
+        x:{ ticks:{color:'#bffff0'}, grid:{color:'#07343d'} },
+        y:{ ticks:{color:'#bffff0'}, grid:{color:'#07343d'} }
+      }
+    }
   });
 }
 
-function computeAgg(){
-  // Group by referrer
-  const byRef = {};
-  for(const d of allDocs){
-    const name = (d.referrer || "unknown").toLowerCase();
-    if(!byRef[name]) byRef[name] = { name, email:"N/A", visits:[] };
-    if(d.email && byRef[name].email==="N/A") byRef[name].email = d.email; // first seen email as "gmail"
-    byRef[name].visits.push(d);
-  }
+// ---------- UI refs ----------
+const tbody = document.getElementById('tbody');
+const q = document.getElementById('q');
+const refPick = document.getElementById('refPick');
+const csvBtn = document.getElementById('csv');
+const dlg = document.getElementById('dlg'), dlgB=document.getElementById('dlgB'), dlgT=document.getElementById('dlgT'), dlgClose=document.getElementById('close'), sum=document.getElementById('sum');
+dlgClose.onclick=()=>dlg.close();
 
-  // Build rows with stats
+// ---------- Data & live render ----------
+let docs = [];
+function aggregate(){
+  // group by referrer
+  const by = {};
+  docs.forEach(d=>{
+    const name = (d.referrer||"unknown").toLowerCase();
+    by[name] ||= { name, gmail:"N/A", visits:[] };
+    if(d.email && by[name].gmail==="N/A") by[name].gmail = d.email;
+    by[name].visits.push(d);
+  });
+
   const rows = [];
-  const now = Date.now();
-
-  Object.values(byRef).forEach(ref=>{
-    const ipCounts = {};
+  Object.values(by).forEach(ref=>{
+    const ipCount = {};
     let total=0, active=0, offline=0, fake=0, score=0;
+    let premium=0,europe=0,me=0,asia=0;
     const countries = {};
-
     ref.visits.forEach(v=>{
       total++;
-      const tsMs = v.ts?.toDate ? v.ts.toDate().getTime() : (v.ts ? new Date(v.ts).getTime() : now);
-      const isActive = (now - tsMs) <= 24*60*60*1000;
-      if(isActive) active++; else offline++;
+      const act = isActive24(v.ts);
+      if(act) active++; else offline++;
+      const ip = v.ip||"";
+      ipCount[ip]=(ipCount[ip]||0)+1;
 
-      const ip = v.ip || "";
-      ipCounts[ip] = (ipCounts[ip]||0)+1;
+      const c = (v.country||"Unknown");
+      countries[c]=(countries[c]||0)+1;
 
-      const ctry = v.country || "Unknown";
-      countries[ctry] = (countries[ctry]||0)+1;
-
-      score += (10 + regionScore(ctry));
+      const rs = regionScore(c);
+      if(rs===500) premium += (10+rs);
+      else if(rs===370) europe += (10+rs);
+      else if(rs===350) me += (10+rs);
+      else asia += (10+rs);
+      score += (10 + rs);
     });
-
-    // fake = sum over IPs of (count-1) where count>1
-    Object.values(ipCounts).forEach(n => { if(n>1) fake += (n-1); });
-
-    const activePct = total ? Math.round((active/total)*100) : 0;
+    Object.values(ipCount).forEach(n=>{ if(n>1) fake += (n-1); });
+    const activePct = total ? Math.round(active/total*100) : 0;
     rows.push({
       name: ref.name,
-      email: ref.email,
-      total, active, offline, fake,
-      activePct,
-      score,
+      gmail: ref.gmail,
+      total, active, offline, fake, activePct, score,
       visits: ref.visits,
-      countries
+      countries, buckets:{premium,europe,me,asia}
     });
   });
 
-  // sort by score desc
   rows.sort((a,b)=> b.score - a.score);
   return rows;
 }
 
 function render(){
-  const rows = computeAgg();
-  const q = (search.value||"").toLowerCase();
-  const filtered = rows.filter(r=> r.name.includes(q));
+  const rows = aggregate();
+  // fill refPick
+  const options = rows.map(r=>`<option value="${r.name}">${r.name.toUpperCase()}</option>`).join("");
+  refPick.innerHTML = "<option value=''>Select referrer…</option>"+options;
 
-  if(filtered.length===0){
-    tbody.innerHTML = `<tr><td class="muted" colspan="10">No data</td></tr>`;
-    return;
-  }
+  // table
+  const term = (q.value||"").toLowerCase();
+  const list = rows.filter(r=> r.name.includes(term));
+  tbody.innerHTML = list.length ? list.map((r,i)=>{
+    const badge = i===0?`<span class="badge">TOP 1</span>`:i===1?`<span class="badge">TOP 2</span>`:i===2?`<span class="badge">TOP 3</span>`:"";
+    const cls = r.activePct>=60?'ok':r.activePct>=30?'warn':'bad';
+    return `<tr>
+      <td>${i+1} ${badge}</td>
+      <td>${r.name.toUpperCase()}</td>
+      <td>${r.gmail}</td>
+      <td>${r.total}</td>
+      <td>${r.active}</td>
+      <td>${r.offline}</td>
+      <td>${r.fake}</td>
+      <td><span class="pill ${cls}">${r.activePct}%</span></td>
+      <td>${r.score}</td>
+      <td><button class="det" data-name="${r.name}">Details</button></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="10" class="muted">No data</td></tr>`;
 
-  tbody.innerHTML = filtered.map((r,idx)=>{
-    const badge = idx===0?'<span class="badge b1">TOP 1</span>': idx===1?'<span class="badge b2">TOP 2</span>': idx===2?'<span class="badge b3">TOP 3</span>':'';
-    const actClass = r.activePct>=60?'pill ok': r.activePct>=30?'pill warn':'pill bad';
-    return `
-      <tr>
-        <td>${idx+1} ${badge}</td>
-        <td>${r.name.toUpperCase()}</td>
-        <td>${r.email}</td>
-        <td>${r.total}</td>
-        <td>${r.active}</td>
-        <td>${r.offline}</td>
-        <td>${r.fake}</td>
-        <td><span class="${actClass}">${r.activePct}%</span></td>
-        <td>${r.score}</td>
-        <td><button data-name="${r.name}" class="details">Details</button></td>
-      </tr>`;
-  }).join("");
-
-  // attach details
-  document.querySelectorAll("button.details").forEach(btn=>{
-    btn.onclick = ()=>{
-      const name = btn.dataset.name;
+  // details handlers
+  document.querySelectorAll("button.det").forEach(b=>{
+    b.onclick = ()=>{
+      const name = b.dataset.name;
+      const rows = aggregate();
       const r = rows.find(x=>x.name===name);
       if(!r) return;
-      dlgTitle.textContent = `Details — ${name.toUpperCase()}`;
+      dlgT.textContent = `Details — ${name.toUpperCase()}`;
       // country summary
       const parts = Object.entries(r.countries).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`${c}: ${n}`).join(" · ");
-      countrySummary.textContent = parts ? `Countries: ${parts}` : "Countries: N/A";
+      sum.textContent = parts ? `Countries: ${parts}` : "Countries: N/A";
       // rows
-      dlgBody.innerHTML = r.visits.map(v=>{
-        const ts = v.ts?.toDate ? v.ts.toDate() : (v.ts ? new Date(v.ts) : new Date());
-        const isActive = (Date.now() - ts.getTime()) <= 24*60*60*1000;
-        // fake mark is recomputed in table by IP duplication; per-visit we show "—" (could be improved if needed)
+      dlgB.innerHTML = r.visits.map(v=>{
+        const act = isActive24(v.ts);
         return `<tr>
-          <td>${v.email || "N/A"}</td>
-          <td>${v.country || "Unknown"}</td>
-          <td>${v.ip || "N/A"}</td>
-          <td>${ts.toLocaleString()}</td>
-          <td>${isActive ? "Yes" : "No"}</td>
-          <td>${"—"}</td>
+          <td>${v.email||"N/A"}</td>
+          <td>${v.verified ? "Yes" : "No"}</td>
+          <td>${v.country||"Unknown"}</td>
+          <td>${v.ip||"N/A"}</td>
+          <td>${niceTime(v.ts)}</td>
+          <td>${act ? "Yes" : "No"}</td>
         </tr>`;
       }).join("");
       dlg.showModal();
+
+      // update CPM bar for this referrer
+      updateBarChart(r.buckets);
     };
   });
+
+  // default bar = all rows sum (optional)
+  const totalBuckets = rows.reduce((acc,r)=>{
+    acc.premium += r.buckets.premium; acc.europe += r.buckets.europe; acc.me += r.buckets.me; acc.asia += r.buckets.asia;
+    return acc;
+  }, {premium:0,europe:0,me:0,asia:0});
+  updateBarChart(totalBuckets);
 }
 
-search.addEventListener("input", render);
-
-// CSV export
-csvBtn.onclick = ()=>{
-  const rows = computeAgg();
-  let csv = "Rank,Name,Gmail,Total Users,Active (24h),Offline,Fake (same IP),Active %,Total Score\n";
+// CSV
+document.getElementById('csv').onclick = ()=>{
+  const rows = aggregate();
+  let csv = "Rank,Name,Gmail,Total,Active24h,Offline,Fake,Active%,Score\n";
   rows.forEach((r,i)=>{
-    csv += [
-      i+1, r.name, r.email, r.total, r.active, r.offline, r.fake, r.activePct+"%", r.score
-    ].join(",") + "\n";
+    csv += [i+1,r.name,r.gmail,r.total,r.active,r.offline,r.fake,`${r.activePct}%`,r.score].join(",")+"\n";
   });
-  const blob = new Blob([csv], {type:"text/csv"});
-  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = "affiliate_leaderboard.csv"; a.click();
-  URL.revokeObjectURL(url);
+  a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download = "leaderboard.csv"; a.click();
 };
+
+// search
+document.getElementById('q').addEventListener('input', render);
+
+// ---------- Boot (live) ----------
+function boot(){
+  // globe
+  buildGlobe();
+
+  // realtime snapshot
+  onSnapshot(collection(db,"referrals"), snap=>{
+    const added = [];
+    docs = snap.docs.map(d=>{
+      const v = d.data();
+      // pulse new-ish (last 10s) items
+      const t = v.ts?.toDate ? v.ts.toDate().getTime() : (v.ts ? new Date(v.ts).getTime() : Date.now());
+      if(Date.now() - t < 10*1000){ added.push(v); }
+      return v;
+    });
+    // push globe points & rings
+    const pts = docs.filter(v => v.lat!=null && v.lon!=null).slice(-500).map(v=>({lat:v.lat,lng:v.lon,size:0.6}));
+    gInstance.pointsData(pts);
+    added.forEach(v=> pulse(v.lat, v.lon));
+    render();
+  });
+}
 </script>
 </body>
 </html>
