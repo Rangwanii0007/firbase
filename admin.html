@@ -1,42 +1,55 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Hacker Affiliate Dashboard</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <!-- Globe + Chart -->
-  <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
-  <script src="https://unpkg.com/globe.gl"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    :root{
-      --bg:#00050a; --panel:#021217; --grid:#06282e; --neon:#00ff88; --neon2:#39ff14; --muted:#78b3a3; --accent:#12e3ff; --bad:#ff4d4d; --warn:#ffd166; --ok:#50fa7b;
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0;background:var(--bg);color:#d7fff1;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Courier New",monospace}
-    .wrap{max-width:1400px;margin:16px auto;padding:0 12px}
-    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}
-    .card{background:linear-gradient(180deg,#001015,#001a22);border:1px solid var(--grid);border-radius:14px;box-shadow:0 0 24px rgba(0,255,136,.05);padding:12px}
-    .title{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.6px}
-    .title .dot{width:8px;height:8px;border-radius:50%;background:var(--neon);box-shadow:0 0 12px var(--neon)}
-    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    input,button{background:#00161d;border:1px solid #07343d;color:#bffff0;border-radius:10px;padding:8px 10px}
-    button{cursor:pointer}
-    table{width:100%;border-collapse:collapse;margin-top:8px}
-    th,td{padding:8px;border-bottom:1px solid #07343d;text-align:center}
-    thead th{position:sticky;top:0;background:#00161d;border-bottom:1px solid #0a3a45}
-    .badge{padding:3px 8px;border-radius:999px;background:var(--neon);color:#00130e;font-weight:700}
-    .muted{color:var(--muted)}
-    .pill{padding:2px 8px;border-radius:8px;border:1px solid #0f3;box-shadow:0 0 10px rgba(0,255,136,.2)}
-    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
-    .mini{font-size:12px}
-    .globeWrap{height:460px;border-radius:12px;overflow:hidden}
-    dialog{border:none;border-radius:14px;max-width:1000px;width:92%;background:#00161d;color:#d7fff1}
-    .dlg-h{display:flex;gap:8px;align-items:center;padding:10px;border-bottom:1px solid #07343d}
-    .dlg-b{padding:10px;max-height:70vh;overflow:auto}
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Affiliate Command Center — Hacker Mode</title>
+
+<!-- Libraries -->
+<script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
+<script src="https://unpkg.com/globe.gl"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  :root{
+    --bg:#00050a; --panel:#041014; --grid:#07343d; --neon:#19ff5f; --neon2:#12e3ff; --muted:#8ec7b8;
+    --bad:#ff4d4d; --warn:#ffd166; --ok:#50fa7b; --txt:#c8ffe3;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:ui-monospace,Menlo,Consolas,monospace;overflow:hidden}
+  .wrap{position:relative;z-index:2;max-width:1600px;margin:12px auto;padding:0 12px}
+  .grid{display:grid;grid-template-columns:1.25fr .75fr;gap:12px}
+  .card{background:linear-gradient(180deg,#031015,#031820);border:1px solid var(--grid);border-radius:14px;box-shadow:0 0 24px rgba(25,255,95,.08);padding:12px}
+  .title{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.6px}
+  .title .dot{width:9px;height:9px;border-radius:50%;background:var(--neon);box-shadow:0 0 14px var(--neon)}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input,button,select{background:#00161d;border:1px solid #0c3a44;color:#bffff0;border-radius:10px;padding:8px 10px}
+  button{cursor:pointer}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{padding:8px;border-bottom:1px solid #0f3a44;text-align:center}
+  thead th{position:sticky;top:0;background:#00161d;border-bottom:1px solid #0f3a44;z-index:1}
+  .badge{padding:3px 8px;border-radius:999px;background:var(--neon);color:#00130e;font-weight:800;box-shadow:0 0 14px rgba(25,255,95,.35)}
+  .muted{color:var(--muted)}
+  .pill{padding:2px 8px;border-radius:8px;border:1px solid #0f3;box-shadow:0 0 12px rgba(25,255,95,.2)}
+  .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+  .mini{font-size:12px}
+  .globeWrap{height:500px;border-radius:12px;overflow:hidden}
+  .right{margin-left:auto}
+  dialog{border:none;border-radius:14px;max-width:1100px;width:94%;background:#03161d;color:var(--txt)}
+  .dlg-h{display:flex;gap:8px;align-items:center;padding:10px;border-bottom:1px solid #0f3a44}
+  .dlg-b{padding:10px;max-height:72vh;overflow:auto}
+  .footerFeed{position:fixed;z-index:2;left:0;right:0;bottom:0;background:#000c12eb;border-top:1px solid #0f3a44;padding:8px 12px;max-height:32vh;overflow:auto}
+  .feed-row{display:grid;grid-template-columns:1.2fr .8fr .8fr .8fr .6fr;gap:8px;padding:4px 0;border-bottom:1px dashed #0c3a44}
+  .feed-row:hover{background:#00161d}
+  /* Matrix rain background canvas sits behind everything */
+  #matrix{position:fixed;inset:0;z-index:0;opacity:.25}
+</style>
 </head>
 <body>
+
+<!-- Matrix rain bg -->
+<canvas id="matrix"></canvas>
+
 <div class="wrap">
   <!-- Login -->
   <div class="card" id="login">
@@ -53,27 +66,27 @@
   <div id="dash" style="display:none">
     <div class="grid">
       <div class="card">
-        <div class="title"><span class="dot"></span> Live World Map (joins in realtime)</div>
+        <div class="title"><span class="dot"></span> Earth Signal Map (Realtime)</div>
         <div id="globe" class="globeWrap"></div>
-        <div class="mini muted">Glowing rings = new visits. Lines show recent burst activity.</div>
+        <div class="mini muted">Green pulses = new verified/unverified joins (based on <code>lat/lon</code>). Lines show recent bursts.</div>
       </div>
       <div class="card">
-        <div class="title"><span class="dot"></span> CPM Breakdown (selected referrer)</div>
+        <div class="title"><span class="dot"></span> CPM Breakdown</div>
         <div class="row" style="margin-top:6px">
           <select id="refPick"></select>
           <button id="csv">Export CSV</button>
           <input id="q" placeholder="Search name…" class="right">
         </div>
-        <canvas id="bar" height="220" style="margin-top:8px"></canvas>
+        <canvas id="bar" height="240" style="margin-top:8px"></canvas>
       </div>
     </div>
 
-    <div class="card" style="margin-top:12px">
-      <div class="title"><span class="dot"></span> Leaderboard (realtime)</div>
+    <div class="card" style="margin-top:12px;max-height:42vh;overflow:auto">
+      <div class="title"><span class="dot"></span> Leaderboard (Realtime)</div>
       <table>
         <thead>
           <tr>
-            <th>Rank</th><th>Name</th><th>Gmail</th><th>Total</th><th>Active 24h</th><th>Offline</th><th>Fake (same IP)</th><th>Active %</th><th>Score</th><th>Details</th>
+            <th>Rank</th><th>Name</th><th>Gmail</th><th>Total</th><th>Active 24h</th><th>Offline</th><th>Fake (IP)</th><th>Active %</th><th>Score</th><th>Details</th>
           </tr>
         </thead>
         <tbody id="tbody"><tr><td colspan="10" class="muted">Listening…</td></tr></tbody>
@@ -82,6 +95,19 @@
   </div>
 </div>
 
+<!-- Live feed -->
+<div class="footerFeed">
+  <div class="row" style="align-items:baseline">
+    <div class="title"><span class="dot"></span> Live Join Feed</div>
+    <span class="mini muted">Recent verified/unverified joins in realtime</span>
+  </div>
+  <div class="feed-row" style="font-weight:700;border-bottom:1px solid #0f3a44;margin-top:6px">
+    <div>Email</div><div>Country</div><div>IP</div><div>Referrer</div><div>Active</div>
+  </div>
+  <div id="feed"></div>
+</div>
+
+<!-- Details modal -->
 <dialog id="dlg">
   <div class="dlg-h">
     <strong id="dlgT">Details</strong>
@@ -97,15 +123,11 @@
 </dialog>
 
 <script type="module">
+/* ---------------- Firebase ---------------- */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-// ---------- Auth gate ----------
-const go = document.getElementById('go'), u=document.getElementById('u'), p=document.getElementById('p');
-const login = document.getElementById('login'), dash=document.getElementById('dash');
-go.onclick=()=>{ if(u.value.trim()==='admin' && p.value.trim()==='nadeem'){ login.style.display='none'; dash.style.display='block'; boot(); } else alert('Wrong'); };
-
-// ---------- Firebase ----------
+/* Your Firebase (exactly as you gave me) */
 const firebaseConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
@@ -118,9 +140,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 
-// ---------- Helpers ----------
+/* ---------------- Login gate ---------------- */
+const go = document.getElementById('go'), u=document.getElementById('u'), p=document.getElementById('p');
+const login = document.getElementById('login'), dash=document.getElementById('dash');
+go.onclick=()=>{ if(u.value.trim()==='admin' && p.value.trim()==='nadeem'){ login.style.display='none'; dash.style.display='block'; boot(); } else alert('Wrong'); };
+
+/* ---------------- Helpers ---------------- */
 function regionScore(country){
-  const c = (country||"").toLowerCase();
+  const c = (country||"").toLowerCase().trim();
   if(["united states","usa","canada","united kingdom","uk","england","scotland","wales","northern ireland"].includes(c)) return 500;
   if(["germany","france","italy","spain","netherlands","sweden","norway","denmark","finland","belgium","switzerland","austria","ireland","portugal","poland","europe"].includes(c)) return 370;
   if(["united arab emirates","uae","saudi arabia","qatar","kuwait","bahrain","oman","middle east"].includes(c)) return 350;
@@ -135,8 +162,8 @@ function isActive24(ts){
   return (Date.now() - d.getTime()) <= 24*60*60*1000;
 }
 
-// ---------- Globe ----------
-let globe, gInstance;
+/* ---------------- Globe ---------------- */
+let gInstance;
 function buildGlobe(){
   if(gInstance) return gInstance;
   const el = document.getElementById("globe");
@@ -146,24 +173,24 @@ function buildGlobe(){
     .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
     .backgroundColor("rgba(0,0,0,0)")
     .pointsData([])
-    .pointAltitude(0.01)
-    .pointColor(()=>"#39ff14")
+    .pointAltitude(0.02)
+    .pointColor(d => d.color || "#39ff14")
     .ringsData([])
     .ringColor(()=> (t)=>`rgba(57,255,20,${1-t})`)
-    .ringMaxRadius(3)
-    .ringPropagationSpeed(2)
+    .ringMaxRadius(4)
+    .ringPropagationSpeed(2.5)
     .ringRepeatPeriod(1000);
   return gInstance;
 }
-function pulse(lat,lon){
+function pulse(lat,lon,verified){
   if(lat==null || lon==null) return;
   const rings = gInstance.ringsData();
-  rings.push({ lat, lng: lon, maxR:3 });
-  if(rings.length>200) rings.shift();
+  rings.push({ lat, lng: lon, verified: !!verified });
+  if(rings.length>250) rings.shift();
   gInstance.ringsData(rings);
 }
 
-// ---------- Charts ----------
+/* ---------------- Charts ---------------- */
 let barChart;
 function updateBarChart(dataset){
   const ctx = document.getElementById('bar').getContext('2d');
@@ -188,23 +215,24 @@ function updateBarChart(dataset){
   });
 }
 
-// ---------- UI refs ----------
+/* ---------------- UI refs ---------------- */
 const tbody = document.getElementById('tbody');
 const q = document.getElementById('q');
 const refPick = document.getElementById('refPick');
 const csvBtn = document.getElementById('csv');
+const feed = document.getElementById('feed');
 const dlg = document.getElementById('dlg'), dlgB=document.getElementById('dlgB'), dlgT=document.getElementById('dlgT'), dlgClose=document.getElementById('close'), sum=document.getElementById('sum');
 dlgClose.onclick=()=>dlg.close();
 
-// ---------- Data & live render ----------
+/* ---------------- Data + Render ---------------- */
 let docs = [];
+
 function aggregate(){
-  // group by referrer
   const by = {};
   docs.forEach(d=>{
     const name = (d.referrer||"unknown").toLowerCase();
     by[name] ||= { name, gmail:"N/A", visits:[] };
-    if(d.email && by[name].gmail==="N/A") by[name].gmail = d.email;
+    if(d.email && d.email!=="N/A" && by[name].gmail==="N/A") by[name].gmail = d.email;
     by[name].visits.push(d);
   });
 
@@ -218,21 +246,23 @@ function aggregate(){
       total++;
       const act = isActive24(v.ts);
       if(act) active++; else offline++;
-      const ip = v.ip||"";
+      const ip = (v.ip||"").trim();
       ipCount[ip]=(ipCount[ip]||0)+1;
 
       const c = (v.country||"Unknown");
       countries[c]=(countries[c]||0)+1;
 
       const rs = regionScore(c);
-      if(rs===500) premium += (10+rs);
-      else if(rs===370) europe += (10+rs);
-      else if(rs===350) me += (10+rs);
-      else asia += (10+rs);
-      score += (10 + rs);
+      const inc = (v.score || (10+rs)); // trust stored score; fallback
+      if(rs===500) premium += inc;
+      else if(rs===370) europe += inc;
+      else if(rs===350) me += inc;
+      else asia += inc;
+      score += inc;
     });
     Object.values(ipCount).forEach(n=>{ if(n>1) fake += (n-1); });
     const activePct = total ? Math.round(active/total*100) : 0;
+
     rows.push({
       name: ref.name,
       gmail: ref.gmail,
@@ -248,9 +278,10 @@ function aggregate(){
 
 function render(){
   const rows = aggregate();
-  // fill refPick
+
+  // fill picker
   const options = rows.map(r=>`<option value="${r.name}">${r.name.toUpperCase()}</option>`).join("");
-  refPick.innerHTML = "<option value=''>Select referrer…</option>"+options;
+  refPick.innerHTML = "<option value=''>All referrals…</option>"+options;
 
   // table
   const term = (q.value||"").toLowerCase();
@@ -280,10 +311,8 @@ function render(){
       const r = rows.find(x=>x.name===name);
       if(!r) return;
       dlgT.textContent = `Details — ${name.toUpperCase()}`;
-      // country summary
       const parts = Object.entries(r.countries).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`${c}: ${n}`).join(" · ");
       sum.textContent = parts ? `Countries: ${parts}` : "Countries: N/A";
-      // rows
       dlgB.innerHTML = r.visits.map(v=>{
         const act = isActive24(v.ts);
         return `<tr>
@@ -297,12 +326,15 @@ function render(){
       }).join("");
       dlg.showModal();
 
-      // update CPM bar for this referrer
       updateBarChart(r.buckets);
+
+      // focus globe to this referrer only (highlight their points)
+      const pts = r.visits.filter(v=>v.lat!=null && v.lon!=null).map(v=>({lat:v.lat,lng:v.lon,size:0.9,color:v.verified?"#39ff14":"#12e3ff"}));
+      gInstance.pointsData(pts);
     };
   });
 
-  // default bar = all rows sum (optional)
+  // default bar = all rows sum
   const totalBuckets = rows.reduce((acc,r)=>{
     acc.premium += r.buckets.premium; acc.europe += r.buckets.europe; acc.me += r.buckets.me; acc.asia += r.buckets.asia;
     return acc;
@@ -310,7 +342,7 @@ function render(){
   updateBarChart(totalBuckets);
 }
 
-// CSV
+/* CSV */
 document.getElementById('csv').onclick = ()=>{
   const rows = aggregate();
   let csv = "Rank,Name,Gmail,Total,Active24h,Offline,Fake,Active%,Score\n";
@@ -322,30 +354,98 @@ document.getElementById('csv').onclick = ()=>{
   a.download = "leaderboard.csv"; a.click();
 };
 
-// search
+/* Search */
 document.getElementById('q').addEventListener('input', render);
 
-// ---------- Boot (live) ----------
+/* Picker resets globe to all */
+document.getElementById('refPick').addEventListener('change', (e)=>{
+  const pick = (e.target.value||"").toLowerCase();
+  if(!pick){
+    const pts = docs.filter(v=>v.lat!=null && v.lon!=null).slice(-800).map(v=>({lat:v.lat,lng:v.lon,size:0.6,color:v.verified?"#39ff14":"#12e3ff"}));
+    gInstance.pointsData(pts);
+  }else{
+    const pts = docs.filter(v=> (v.referrer||"").toLowerCase()===pick && v.lat!=null && v.lon!=null)
+                    .map(v=>({lat:v.lat,lng:v.lon,size:0.9,color:v.verified?"#39ff14":"#12e3ff"}));
+    gInstance.pointsData(pts);
+  }
+});
+
+/* ---------------- Boot (live) ---------------- */
 function boot(){
-  // globe
+  // Matrix rain bg
+  startMatrix();
+
+  // Globe
   buildGlobe();
 
-  // realtime snapshot
+  // Realtime Firestore
   onSnapshot(collection(db,"referrals"), snap=>{
     const added = [];
-    docs = snap.docs.map(d=>{
-      const v = d.data();
-      // pulse new-ish (last 10s) items
-      const t = v.ts?.toDate ? v.ts.toDate().getTime() : (v.ts ? new Date(v.ts).getTime() : Date.now());
-      if(Date.now() - t < 10*1000){ added.push(v); }
-      return v;
-    });
-    // push globe points & rings
-    const pts = docs.filter(v => v.lat!=null && v.lon!=null).slice(-500).map(v=>({lat:v.lat,lng:v.lon,size:0.6}));
+    docs = snap.docs.map(d=> d.data());
+
+    // Live globe points (all)
+    const pts = docs.filter(v=> v.lat!=null && v.lon!=null).slice(-800)
+                    .map(v=> ({lat:v.lat,lng:v.lon,size:0.6,color:v.verified?"#39ff14":"#12e3ff"}));
     gInstance.pointsData(pts);
-    added.forEach(v=> pulse(v.lat, v.lon));
+
+    // find fresh docs < 7s → pulse + feed
+    docs.forEach(v=>{
+      const t = v.ts?.toDate ? v.ts.toDate().getTime() : (v.ts ? new Date(v.ts).getTime() : 0);
+      if(Date.now() - t < 7000){ added.push(v); }
+    });
+    added.forEach(v=> {
+      pulse(v.lat, v.lon, v.verified);
+      pushFeed(v);
+    });
+
     render();
   });
+}
+
+/* ---------------- Live feed ---------------- */
+function pushFeed(v){
+  const row = document.createElement('div');
+  row.className = 'feed-row';
+  row.innerHTML = `
+    <div>${(v.email && v.email!=="N/A")? v.email : "<span class='muted'>Unknown</span>"}</div>
+    <div>${v.country||"<span class='muted'>Unknown</span>"}</div>
+    <div>${v.ip||"<span class='muted'>N/A</span>"}</div>
+    <div>${(v.referrer||"unknown").toUpperCase()}</div>
+    <div>${isActive24(v.ts)?"<span class='ok'>Yes</span>":"<span class='muted'>No</span>"}</div>
+  `;
+  feed.prepend(row);
+  // keep 80 rows
+  while(feed.children.length>80) feed.removeChild(feed.lastChild);
+}
+
+/* ---------------- Matrix rain ---------------- */
+function startMatrix(){
+  const c = document.getElementById("matrix");
+  const ctx = c.getContext("2d");
+  function resize(){ c.width = window.innerWidth; c.height = window.innerHeight; }
+  resize(); window.addEventListener('resize', resize);
+
+  const letters = "01ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%&*";
+  const fontSize = 14;
+  const columns = Math.floor(c.width / fontSize);
+  const drops = Array(columns).fill(1);
+
+  function draw(){
+    ctx.fillStyle = "rgba(0, 12, 18, 0.12)";
+    ctx.fillRect(0,0,c.width,c.height);
+
+    ctx.fillStyle = "#19ff5f";
+    ctx.font = fontSize + "px monospace";
+
+    for(let i=0;i<drops.length;i++){
+      const txt = letters[Math.floor(Math.random()*letters.length)];
+      ctx.fillText(txt, i*fontSize, drops[i]*fontSize);
+      if(drops[i]*fontSize > c.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
 }
 </script>
 </body>
