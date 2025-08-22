@@ -1,78 +1,134 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin Dashboard</title>
-  <style>
-    body {
-      margin: 0;
-      background: #000;
-      color: #00ffcc;
-      font-family: "Courier New", monospace;
-      overflow: hidden;
-    }
-    #login-section, #dashboard {
-      display: none;
-      height: 100vh;
-      width: 100vw;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-    }
-    #login-section.active, #dashboard.active {
-      display: flex;
-    }
-    input, button {
-      background: #111;
-      border: 1px solid #0ff;
-      color: #0ff;
-      padding: 10px;
-      margin: 5px;
-      border-radius: 6px;
-    }
-    button:hover { background: #0ff; color: #000; cursor: pointer; }
-    #earth-container {
-      position: absolute;
-      top:0; left:0; width:100%; height:100%;
-      z-index:-1;
-    }
-    #user-list {
-      background: rgba(0,0,0,0.7);
-      padding: 20px;
-      border-radius: 12px;
-      max-height: 60vh;
-      overflow-y: auto;
-    }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Affiliate Command Center — Hacker Mode</title>
+
+<!-- Three.js + Globe + Chart.js -->
+<script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
+<script src="https://unpkg.com/globe.gl"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  :root{
+    --bg:#00060b; --panel:#021617; --neon:#00ff7a; --accent:#12e3ff; --muted:#89cbb8;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#000,#001217);color:#c8ffe3;font-family:ui-monospace,monospace;overflow:hidden}
+  .container{max-width:1400px;margin:12px auto;padding:12px;display:flex;flex-direction:column;gap:12px}
+  .topbar{display:flex;align-items:center;gap:12px}
+  .title{display:flex;align-items:center;gap:10px;font-weight:900}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--neon);box-shadow:0 0 10px var(--neon)}
+  .loginCard{background:linear-gradient(180deg,#011215,#002028);border-radius:10px;padding:12px;border:1px solid rgba(0,255,122,.06)}
+  .mainGrid{display:grid;grid-template-columns:1fr 420px;gap:12px;align-items:start}
+  .card{background:linear-gradient(180deg,#00161b,#001a22);border-radius:12px;padding:12px;border:1px solid rgba(10,30,30,0.6);box-shadow:0 12px 40px rgba(0,255,122,0.02)}
+  .globeWrap{height:62vh;border-radius:10px;overflow:hidden}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  input,select,button{background:#00161d;border:1px solid #0b3a44;color:#bff;border-radius:8px;padding:8px}
+  button{cursor:pointer}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+  thead th{position:sticky;top:0;background:#00161d;padding:8px;text-align:center;border-bottom:1px solid #0a3a44}
+  td,th{padding:8px;border-bottom:1px solid #0c3940;text-align:center}
+  .muted{color:var(--muted);font-size:13px}
+  .feed{height:22vh;overflow:auto;border-top:1px solid rgba(10,30,30,0.4);padding-top:8px;margin-top:8px}
+  .feedRow{display:grid;grid-template-columns:1fr .6fr .6fr .5fr;gap:8px;padding:6px 0;border-bottom:1px dashed rgba(10,30,30,0.4)}
+  .pill{padding:4px 8px;border-radius:999px;background:rgba(0,255,122,0.06)}
+  .badge{padding:3px 7px;border-radius:7px;background:var(--neon);color:#001;font-weight:700}
+  dialog{border:none;border-radius:10px;background:#02181a;color:#c8ffe3;padding:0}
+  .dlgHead{display:flex;align-items:center;padding:10px;border-bottom:1px solid rgba(10,30,30,0.4)}
+  .dlgBody{padding:10px;max-height:60vh;overflow:auto}
+  @media (max-width:900px){
+    .mainGrid{grid-template-columns:1fr;grid-auto-rows:auto}
+    .globeWrap{height:50vh}
+  }
+</style>
 </head>
 <body>
-  <!-- LOGIN -->
-  <section id="login-section" class="active">
-    <h2>Admin Login</h2>
-    <input type="email" id="email" placeholder="Admin Email">
-    <input type="password" id="password" placeholder="Password">
-    <button id="loginBtn">Login</button>
-    <p id="loginMsg"></p>
-  </section>
+<div class="container">
+  <div class="topbar">
+    <div class="title"><div class="dot"></div> Affiliate Command Center</div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <div class="muted">Realtime</div>
+      <button id="exportCsv">Export CSV</button>
+      <button id="settingsBtn">Settings</button>
+    </div>
+  </div>
 
-  <!-- DASHBOARD -->
-  <section id="dashboard">
-    <canvas id="earth-container"></canvas>
-    <h1>🌍 Live User Map</h1>
-    <div id="user-list"></div>
-    <button id="logoutBtn">Logout</button>
-  </section>
+  <!-- Login -->
+  <div id="loginCard" class="loginCard card" style="max-width:700px">
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="loginUser" placeholder="username" value="admin">
+      <input id="loginPass" placeholder="password" type="password">
+      <button id="loginBtn">Open Dashboard</button>
+      <div class="muted" style="margin-left:auto">Hint: admin / nadeem</div>
+    </div>
+  </div>
 
-  <!-- Firebase -->
-  <script type="module">
-    // Import Firebase SDK
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <!-- Main area (hidden until login) -->
+  <div id="mainGrid" class="mainGrid" style="display:none">
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-weight:800">World Signal Map</div>
+        <div class="muted">Live joins (verified/unverified)</div>
+        <div style="margin-left:auto" class="muted"><span id="statTotal">0</span> total · <span id="statActive">0</span> active(24h)</div>
+      </div>
 
-    // ✅ Replace with your Firebase config
-    const firebaseConfig = {
+      <div id="globe" class="globeWrap" style="margin-top:8px"></div>
+      <div id="feed" class="feed"></div>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column">
+      <div class="controls">
+        <select id="refSelect"><option value="">All Referrers</option></select>
+        <input id="search" placeholder="Search name or email">
+        <button id="refresh">Refresh</button>
+      </div>
+
+      <div style="flex:1;overflow:auto;margin-top:8px">
+        <table>
+          <thead><tr><th>Rank</th><th>Name</th><th>Email</th><th>Total</th><th>Active24</th><th>Offline</th><th>Fake</th><th>Active%</th><th>Score</th><th>Details</th></tr></thead>
+          <tbody id="leaderboardBody"><tr><td colspan="10" class="muted">Waiting for data…</td></tr></tbody>
+        </table>
+      </div>
+      <div style="margin-top:8px">
+        <canvas id="cpmChart" height="140"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings dialog -->
+<dialog id="settingsDlg">
+  <div class="dlgHead"><strong>Settings - Firebase Config</strong><button id="closeSettings" style="margin-left:auto">Close</button></div>
+  <div class="dlgBody">
+    <textarea id="fbConfig" rows="8" style="width:100%;background:#021a1b;color:#bff;border-radius:6px;padding:8px"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="saveConfig">Save</button>
+      <div class="muted">Saved config stored in localStorage for convenience.</div>
+    </div>
+  </div>
+</dialog>
+
+<!-- Details dialog -->
+<dialog id="detailsDlg">
+  <div class="dlgHead"><strong id="detailsTitle">Details</strong><button id="closeDetails" style="margin-left:auto">Close</button></div>
+  <div class="dlgBody">
+    <div id="detailsSummary" class="muted" style="margin-bottom:8px"></div>
+    <table style="width:100%"><thead><tr><th>Email</th><th>Verified</th><th>Country</th><th>IP</th><th>When</th><th>Active</th></tr></thead><tbody id="detailsBody"></tbody></table>
+  </div>
+</dialog>
+
+<script type="module">
+/* ========================= ADMIN.HTML (complete) =========================
+ - Uses Firestore 'referrals' collection written by client tracker + Cloud Function
+ - Login gate: username 'admin' + password 'nadeem' (simple local gate)
+ - Realtime globe with points, animated rings, and arcs (inviter → invitee)
+ - Leaderboard + details modal, CSV export, settings (edit Firebase config)
+=============================================================================*/
+
+/* ---- default Firebase config (yours) ---- */
+const defaultConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
   projectId: "adwatchrewardsapp",
@@ -80,79 +136,339 @@
   messagingSenderId: "782268735936",
   appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
   measurementId: "G-4NG2564HTK"
-    };
+};
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+/* ---- DOM refs ---- */
+const loginBtn = document.getElementById('loginBtn'),
+      loginUser = document.getElementById('loginUser'),
+      loginPass = document.getElementById('loginPass'),
+      loginCard = document.getElementById('loginCard'),
+      mainGrid = document.getElementById('mainGrid'),
+      leaderboardBody = document.getElementById('leaderboardBody'),
+      feed = document.getElementById('feed'),
+      statTotal = document.getElementById('statTotal'),
+      statActive = document.getElementById('statActive'),
+      refSelect = document.getElementById('refSelect'),
+      searchEl = document.getElementById('search'),
+      refreshBtn = document.getElementById('refresh'),
+      exportCsvBtn = document.getElementById('exportCsv'),
+      settingsBtn = document.getElementById('settingsBtn'),
+      settingsDlg = document.getElementById('settingsDlg'),
+      fbConfigTA = document.getElementById('fbConfig'),
+      saveConfig = document.getElementById('saveConfig'),
+      closeSettings = document.getElementById('closeSettings'),
+      detailsDlg = document.getElementById('detailsDlg'),
+      detailsTitle = document.getElementById('detailsTitle'),
+      detailsBody = document.getElementById('detailsBody'),
+      detailsSummary = document.getElementById('detailsSummary'),
+      closeDetails = document.getElementById('closeDetails');
 
-    // DOM elements
-    const loginSection = document.getElementById("login-section");
-    const dashboard = document.getElementById("dashboard");
-    const loginBtn = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const loginMsg = document.getElementById("loginMsg");
-    const userList = document.getElementById("user-list");
+closeSettings.onclick = ()=> settingsDlg.close();
+settingsBtn.onclick = ()=> settingsDlg.showModal();
+closeDetails.onclick = ()=> detailsDlg.close();
 
-    // LOGIN
-    loginBtn.addEventListener("click", async () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch (e) {
-        loginMsg.textContent = e.message;
-      }
+/* ---- settings load/save ---- */
+const storedCfg = localStorage.getItem('affiliate_firebase_config') || JSON.stringify(defaultConfig, null, 2);
+fbConfigTA.value = storedCfg;
+saveConfig.onclick = ()=>{
+  try{
+    const obj = JSON.parse(fbConfigTA.value);
+    localStorage.setItem('affiliate_firebase_config', JSON.stringify(obj));
+    alert('Saved config to localStorage. Reloading to apply');
+    location.reload();
+  }catch(e){ alert('Invalid JSON'); }
+};
+
+/* ---- initialize firebase (from stored or default) ---- */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const cfg = JSON.parse(localStorage.getItem('affiliate_firebase_config') || JSON.stringify(defaultConfig));
+const app = initializeApp(cfg);
+const db = getFirestore(app);
+
+/* ---- globe ---- */
+let gInstance;
+function buildGlobe(){
+  if(gInstance) return gInstance;
+  const el = document.getElementById('globe');
+  gInstance = Globe()(el)
+    .globeImageUrl("//unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
+    .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
+    .backgroundColor("rgba(0,0,0,0)")
+    .pointsData([])
+    .pointAltitude(0.03)
+    .pointRadius(0.4)
+    .pointColor(d => d.color || "#39ff14")
+    .ringsData([])
+    .ringColor(() => t => `rgba(0,255,122,${1-t})`)
+    .ringMaxRadius(4)
+    .ringPropagationSpeed(2.3)
+    .ringRepeatPeriod(1000)
+    .arcsData([])
+    .arcDashLength(0.4)
+    .arcDashGap(0.6)
+    .arcDashAnimateTime(3000)
+    .arcColor(a => a.color || '#12e3ff')
+    .arcStroke(0.9);
+  return gInstance;
+}
+function pulse(lat,lon,verified){
+  if(!gInstance || lat==null || lon==null) return;
+  const rings = gInstance.ringsData() || [];
+  rings.push({ lat, lng: lon, verified: !!verified });
+  if(rings.length>300) rings.shift();
+  gInstance.ringsData(rings);
+}
+
+/* ---- helpers ---- */
+function niceTime(ts){ const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : new Date()); return d.toLocaleString(); }
+function isActive24(ts){ const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : new Date()); return (Date.now() - d.getTime()) <= 24*60*60*1000; }
+function regionScore(country){
+  const c=(country||"").toLowerCase();
+  if(["usa","united states","canada","uk"].some(x=>c.includes(x))) return 500;
+  if(["germany","france","italy","spain","netherlands"].some(x=>c.includes(x))) return 370;
+  if(["uae","saudi","qatar","kuwait"].some(x=>c.includes(x))) return 350;
+  return 130;
+}
+
+/* ---- realtime & aggregation ---- */
+let rawDocs = [];
+function aggregate(){
+  const by = {};
+  rawDocs.forEach(d=>{
+    const name = (d.referrer || "unknown").toLowerCase();
+    if(!by[name]) by[name] = { name, email: "N/A", visits: [] };
+    if(d.email && d.email !== "N/A" && by[name].email === "N/A") by[name].email = d.email;
+    by[name].visits.push(d);
+  });
+
+  const rows = [];
+  Object.values(by).forEach(entry=>{
+    const ipCount = {}; let total=0, active=0, offline=0, fake=0, score=0; const countries={};
+    entry.visits.forEach(v=>{
+      total++; if(isActive24(v.ts)) active++; else offline++;
+      ipCount[v.ip || ""] = (ipCount[v.ip || ""]||0) + 1;
+      const c = v.country || "Unknown"; countries[c] = (countries[c]||0) + 1;
+      score += Number(v.score || (10 + regionScore(c)));
     });
+    Object.values(ipCount).forEach(n=>{ if(n>1) fake += (n-1); });
+    const activePct = total ? Math.round(active/total*100) : 0;
+    rows.push({ name: entry.name, email: entry.email, total, active, offline, fake, activePct, score, visits: entry.visits, countries });
+  });
 
-    // LOGOUT
-    logoutBtn.addEventListener("click", async () => {
-      await signOut(auth);
-    });
+  rows.sort((a,b)=> b.score - a.score);
+  return rows;
+}
 
-    // Auth state
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        loginSection.classList.remove("active");
-        dashboard.classList.add("active");
-        loadUsers();
-      } else {
-        loginSection.classList.add("active");
-        dashboard.classList.remove("active");
-      }
-    });
+function render(){
+  const rows = aggregate();
+  // header stats
+  statTotal.textContent = rawDocs.length;
+  statActive.textContent = rawDocs.filter(d => isActive24(d.ts)).length;
 
-    // Real-time Firestore Users
-    function loadUsers() {
-      onSnapshot(collection(db, "users"), (snapshot) => {
-        userList.innerHTML = "";
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const div = document.createElement("div");
-          div.textContent = `${data.name || "Unknown"} — ${data.email || ""}`;
-          userList.appendChild(div);
+  // ref select
+  refSelect.innerHTML = "<option value=''>All Referrers</option>" + rows.map(r=>`<option value="${r.name}">${r.name.toUpperCase()}</option>`).join("");
+
+  // filter
+  const q = (searchEl.value || "").toLowerCase();
+  const list = rows.filter(r => r.name.includes(q) || (r.email||"").toLowerCase().includes(q));
+  if(list.length===0) leaderboardBody.innerHTML = `<tr><td colspan="10" class="muted">No data</td></tr>`;
+  else leaderboardBody.innerHTML = list.map((r,i)=>`
+    <tr>
+      <td>${i+1}${i===0? ' <span class="badge">TOP</span>':''}</td>
+      <td>${r.name.toUpperCase()}</td>
+      <td>${r.email}</td>
+      <td>${r.total}</td>
+      <td>${r.active}</td>
+      <td>${r.offline}</td>
+      <td>${r.fake}</td>
+      <td><span class="pill">${r.activePct}%</span></td>
+      <td>${r.score}</td>
+      <td><button class="detBtn" data-name="${r.name}">Details</button></td>
+    </tr>
+  `).join("");
+
+  // detail handlers
+  document.querySelectorAll('.detBtn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const name = btn.dataset.name;
+      const r = rows.find(x=>x.name===name);
+      if(!r) return;
+      detailsTitle.textContent = `Details — ${name.toUpperCase()}`;
+      detailsSummary.textContent = Object.entries(r.countries || {}).map(([c,n])=>`${c}: ${n}`).join(' · ');
+      detailsBody.innerHTML = r.visits.map(v=>`<tr>
+        <td>${v.email || 'N/A'}</td>
+        <td>${v.verified ? 'Yes' : 'No'}</td>
+        <td>${v.country || 'Unknown'}</td>
+        <td>${v.ip || 'N/A'}</td>
+        <td>${niceTime(v.ts)}</td>
+        <td>${isActive24(v.ts) ? 'Yes' : 'No'}</td>
+      </tr>`).join('');
+      detailsDlg.showModal();
+
+      // focus globe to this referrer & build arcs
+      const pts = r.visits.filter(v=>v.lat!=null && v.lon!=null).map(v=>({lat:v.lat,lng:v.lon,size:0.9,color:v.verified?"#39ff14":"#12e3ff"}));
+      gInstance.pointsData(pts);
+
+      // build arcs from "inviter location" -> each visit (if inviter loc exists)
+      const refLoc = rawDocs.find(d => (d.referrer||'').toLowerCase() === name && d.lat!=null && d.lon!=null);
+      const arcs = [];
+      if(refLoc){
+        r.visits.forEach(v=>{
+          if(v.lat!=null && v.lon!=null && !(v.lat===refLoc.lat && v.lon===refLoc.lon)){
+            arcs.push({
+              startLat: refLoc.lat, startLng: refLoc.lon,
+              endLat: v.lat, endLng: v.lon,
+              color: v.verified ? '#39ff14' : '#12e3ff'
+            });
+          }
         });
-      });
-    }
+      }
+      gInstance.arcsData(arcs);
+      updateCPMChart(r);
+    };
+  });
 
-    // 🌍 Rotating Earth (Three.js)
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.152.0/build/three.module.js";
-    let scene = new THREE.Scene();
-    let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight,0.1,1000);
-    let renderer = new THREE.WebGLRenderer({canvas: document.getElementById("earth-container"), alpha:true});
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    let geometry = new THREE.SphereGeometry(3,64,64);
-    let material = new THREE.MeshBasicMaterial({map: new THREE.TextureLoader().load("https://threejs.org/examples/textures/land_ocean_ice_cloud_2048.jpg")});
-    let earth = new THREE.Mesh(geometry,material);
-    scene.add(earth);
-    camera.position.z = 6;
-    function animate(){
-      requestAnimationFrame(animate);
-      earth.rotation.y += 0.002;
-      renderer.render(scene,camera);
-    }
-    animate();
-  </script>
+  // global CPM chart update: sum buckets by country classification
+  const totals = rows.reduce((acc, r)=>{
+    Object.entries(r.countries || {}).forEach(([c,n])=>{
+      const rs = regionScore(c);
+      if(rs===500) acc.premium += n*(10+rs);
+      else if(rs===370) acc.europe += n*(10+rs);
+      else if(rs===350) acc.me += n*(10+rs);
+      else acc.asia += n*(10+rs);
+    });
+    return acc;
+  }, {premium:0,europe:0,me:0,asia:0});
+  updateCPMChart(totals);
+}
+
+/* ---- chart ---- */
+let barChart;
+function updateCPMChart(buckets){
+  const ctx = document.getElementById('cpmChart').getContext('2d');
+  const labels = ["Premium (US/CA/UK)","Europe","Middle East","Asia/Other"];
+  const data = [buckets.premium||0, buckets.europe||0, buckets.me||0, buckets.asia||0];
+  if(barChart){ barChart.data.datasets[0].data = data; barChart.update(); return; }
+  barChart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'CPM Score', data, backgroundColor:['#00ff7a','#12e3ff','#ffd166','#7af0b8'] }]},
+    options:{ plugins:{ legend:{display:false} }, scales:{ x:{ ticks:{color:'#bff'} }, y:{ ticks:{color:'#bff'} } } }
+  });
+}
+
+/* ---- realtime snapshot ---- */
+import { collection as coll } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { onSnapshot as onSnap } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+const referralsCol = coll(db, "referrals");
+
+function startRealtime(){
+  gInstance = buildGlobe();
+
+  onSnap(referralsCol, snap=>{
+    rawDocs = snap.docs.map(d=>{
+      const data = d.data();
+      return {
+        ...data,
+        referrer: (data.referrer || data.referrerRaw || "unknown").toString().toLowerCase(),
+        email: data.email || "N/A",
+        verified: !!data.verified,
+        ip: data.ip || "",
+        country: data.country || "",
+        lat: data.lat || null,
+        lon: data.lon || null,
+        score: Number(data.score || 0),
+        ts: data.ts || data.server_ts || null
+      };
+    });
+
+    // build globe points
+    const pts = rawDocs.filter(r => r.lat!=null && r.lon!=null).slice(-1200).map(v=>({lat:v.lat,lng:v.lon,size:0.6,color:v.verified?"#39ff14":"#12e3ff"}));
+    gInstance.pointsData(pts);
+
+    // build arcs: map latest location per referrer and create arcs inviter->invitee
+    const refLoc = {};
+    rawDocs.forEach(d => {
+      if(d.lat!=null && d.lon!=null){
+        const name = (d.referrer || "unknown").toLowerCase();
+        if(!refLoc[name]) refLoc[name] = { lat: d.lat, lon: d.lon };
+      }
+    });
+    const arcs = [];
+    rawDocs.forEach(d=>{
+      const inviter = (d.referrer || "unknown").toLowerCase();
+      if(refLoc[inviter] && d.lat!=null && d.lon!=null){
+        arcs.push({
+          startLat: refLoc[inviter].lat, startLng: refLoc[inviter].lon,
+          endLat: d.lat, endLng: d.lon,
+          color: d.verified ? '#39ff14' : '#12e3ff'
+        });
+      }
+    });
+    gInstance.arcsData(arcs);
+
+    // show pulses for very recent joins and push feed
+    rawDocs.forEach(v=>{
+      const t = v.ts?.toDate ? v.ts.toDate().getTime() : (v.ts ? new Date(v.ts).getTime() : 0);
+      if(Date.now() - t < 8000 && v.lat!=null && v.lon!=null){
+        pulse(v.lat, v.lon, v.verified);
+        pushFeed(v);
+      }
+    });
+
+    render();
+  });
+}
+
+/* ---- feed ---- */
+function pushFeed(v){
+  const el = document.createElement('div');
+  el.className = 'feedRow';
+  el.innerHTML = `<div>${(v.email && v.email!=="N/A") ? v.email : '<span class="muted">Unknown</span>'}</div>
+                  <div>${v.country || '<span class="muted">Unknown</span>'}</div>
+                  <div>${v.ip || 'N/A'}</div>
+                  <div>${(v.referrer||'unknown').toUpperCase()}</div>`;
+  feed.prepend(el);
+  while(feed.children.length>140) feed.removeChild(feed.lastChild);
+}
+
+/* ---- CSV export ---- */
+exportCsvBtn.onclick = ()=>{
+  const rows = aggregate();
+  let csv = 'Rank,Name,Email,Total,Active24,Offline,Fake,Active%,Score\n';
+  rows.forEach((r,i)=> csv += [i+1,r.name,r.email,r.total,r.active,r.offline,r.fake,r.activePct + '%', r.score].join(',') + '\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download = 'leaderboard.csv'; a.click();
+};
+
+/* ---- interactions ---- */
+loginBtn.onclick = ()=>{
+  if(loginUser.value.trim() === 'admin' && loginPass.value.trim() === 'nadeem'){
+    loginCard.style.display = 'none';
+    mainGrid.style.display = 'grid';
+    startRealtime();
+  } else {
+    alert('Wrong credentials');
+  }
+};
+closeDetails.onclick = ()=> detailsDlg.close();
+refreshBtn.onclick = ()=> render();
+searchEl.addEventListener('input', render);
+refSelect.addEventListener('change', e=>{
+  const pick = (e.target.value||"").toLowerCase();
+  if(!pick){
+    const pts = rawDocs.filter(v=>v.lat!=null && v.lon!=null).slice(-800).map(v=>({lat:v.lat,lng:v.lon,size:0.6,color:v.verified?"#39ff14":"#12e3ff"}));
+    gInstance.pointsData(pts);
+    gInstance.arcsData([]);
+  } else {
+    const pts = rawDocs.filter(v => (v.referrer||"").toLowerCase()===pick && v.lat!=null && v.lon!=null).map(v=>({lat:v.lat,lng:v.lon,size:0.9,color:v.verified?"#39ff14":"#12e3ff"}));
+    gInstance.pointsData(pts);
+  }
+});
+
+/* ---- start globe quickly (so page loads visually) ---- */
+gInstance = buildGlobe();
+
+</script>
 </body>
 </html>
-
