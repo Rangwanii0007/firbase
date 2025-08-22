@@ -3,95 +3,145 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Affiliate — Hacker Live Dashboard</title>
+<title>Affiliate Command Center — Hacker Mode (Responsive)</title>
 
-<!-- libs -->
+<!-- Three / Globe / Chart.js -->
 <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
 <script src="https://unpkg.com/globe.gl"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-  :root{ --bg:#00050a; --neon:#19ff5f; --muted:#7fbfb0; --panel:#03161d; }
+  :root{
+    --bg:#00040a; --panel:#03161d; --muted:#7fbfb0; --neon:#19ff5f; --accent:#12e3ff; --glass: rgba(255,255,255,0.03);
+  }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:#000; color:#c8ffe3; font-family:ui-monospace,monospace; overflow:hidden}
-  .wrap{position:relative;z-index:2;max-width:1400px;margin:12px auto;padding:12px}
-  .grid{display:grid;grid-template-columns:1.4fr .6fr;gap:12px}
-  .card{background:linear-gradient(180deg,#001116,#001a22);border:1px solid #07343d;border-radius:12px;padding:12px}
-  .title{display:flex;align-items:center;gap:8px;font-weight:800}
-  .dot{width:9px;height:9px;border-radius:50%;background:var(--neon);box-shadow:0 0 10px var(--neon)}
-  input,select,button{background:#00161d;border:1px solid #0b3a44;color:#bffff0;border-radius:8px;padding:8px}
-  table{width:100%;border-collapse:collapse;margin-top:8px}
-  th,td{padding:8px;border-bottom:1px solid #07343d;text-align:center;font-size:13px}
-  thead th{position:sticky;top:0;background:#00161d}
-  .globeWrap{height:520px;border-radius:10px;overflow:hidden}
-  .feed{position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);padding:8px;border-top:1px solid #07343d;max-height:28vh;overflow:auto}
-  .feed-row{display:grid;grid-template-columns:1.4fr .6fr .6fr .6fr;gap:8px;padding:6px 0;border-bottom:1px dashed #07343d}
-  .pill{padding:3px 8px;border-radius:999px;background:rgba(25,255,128,.06)}
-  button.small{padding:6px 8px}
-  dialog{border:none;border-radius:10px;background:#02171a;color:#c8ffe3}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#000,#001217);color:#c8ffe3;font-family:ui-monospace,monospace; -webkit-font-smoothing:antialiased;}
+  .app{display:flex;flex-direction:column;height:100vh;gap:12px;padding:12px}
+  /* header */
+  .topbar{display:flex;align-items:center;gap:12px}
+  .title{display:flex;align-items:center;gap:10px;font-weight:800}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--neon);box-shadow:0 0 12px var(--neon)}
+  /* layout */
+  .mainGrid{display:grid;grid-template-columns:1fr 420px;gap:12px;flex:1;min-height:0}
+  .card{background:linear-gradient(180deg,#001216,#001A22);border-radius:12px;border:1px solid rgba(10,30,30,0.6);padding:12px;box-shadow:0 6px 40px rgba(0,255,160,0.02);overflow:hidden}
+  /* globe */
+  .globeWrap{height:62vh;border-radius:10px;overflow:hidden}
+  /* right column */
+  .controls{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+  input,select,button{background:#00161d;border:1px solid #0b3a44;color:#bff;border-radius:8px;padding:8px}
+  button{cursor:pointer}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+  thead th{position:sticky;top:0;background:#00161d;padding:8px;text-align:center;border-bottom:1px solid #0a3a44}
+  td,th{padding:8px;border-bottom:1px solid #0c3940;text-align:center}
+  .muted{color:var(--muted);font-size:13px}
+  .feed{height:22vh;overflow:auto;border-top:1px solid rgba(10,30,30,0.4);padding-top:8px;margin-top:8px}
+  .feedRow{display:grid;grid-template-columns:1fr .7fr .7fr .8fr;gap:8px;padding:6px 0;border-bottom:1px dashed rgba(10,30,30,0.4)}
+  .feedRow:hover{background:rgba(25,255,95,0.02)}
+  .pill{padding:4px 8px;border-radius:999px;background:rgba(25,255,95,0.06);border:1px solid rgba(25,255,95,0.08)}
+  .badge{padding:3px 7px;border-radius:7px;background:var(--neon);color:#001; font-weight:700}
+  /* modal */
+  dialog{border:none;border-radius:10px;background:#02181a;color:#c8ffe3;padding:0}
+  .dlgHead{display:flex;align-items:center;padding:10px;border-bottom:1px solid rgba(10,30,30,0.4)}
+  .dlgBody{padding:10px;max-height:60vh;overflow:auto}
+  /* responsive */
+  @media (max-width: 900px){
+    .mainGrid{grid-template-columns:1fr; grid-auto-rows:auto}
+    .globeWrap{height:50vh}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div id="loginCard" class="card">
-    <div class="title"><div class="dot"></div> Admin Login</div>
-    <div style="margin-top:8px">
-      <input id="user" placeholder="admin" value="admin">
-      <input id="pass" placeholder="password" type="password">
-      <button id="loginBtn">Open</button>
-      <span class="small" style="margin-left:10px;color:#9fb">Hint: admin / nadeem</span>
+<div class="app">
+  <div class="topbar">
+    <div class="title"><div class="dot"></div> Affiliate Command Center</div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <div class="muted">Auto: Realtime</div>
+      <button id="exportCsv">Export CSV</button>
+      <button id="settingsBtn">Settings</button>
     </div>
   </div>
 
-  <div id="main" style="display:none">
-    <div class="grid">
-      <div class="card">
-        <div class="title"><div class="dot"></div> Earth — Live Joins</div>
-        <div id="globe" class="globeWrap"></div>
-        <div class="small" style="margin-top:6px;color:#9fb">Pulses = new joins; arcs = inviter → invitee (animated)</div>
-      </div>
+  <!-- login card (keeps it simple) -->
+  <div id="loginCard" class="card" style="max-width:520px">
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="loginUser" placeholder="username" value="admin">
+      <input id="loginPass" placeholder="password" type="password">
+      <button id="loginBtn">Enter</button>
+      <div class="muted" style="margin-left:auto">Hint: admin / nadeem</div>
+    </div>
+  </div>
 
-      <div class="card">
-        <div class="title"><div class="dot"></div> Controls & CPM</div>
-        <div style="margin-top:8px;display:flex;gap:8px">
-          <select id="refPick"><option value="">All referrals…</option></select>
-          <input id="search" placeholder="Search name…">
-          <button id="exportCsv" class="small">CSV</button>
-        </div>
-        <canvas id="cpmChart" height="260" style="margin-top:12px"></canvas>
+  <!-- main grid -->
+  <div class="mainGrid" id="dashboard" style="display:none">
+    <!-- left: globe + feed -->
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-weight:800">World Signal Map</div>
+        <div class="muted">Live joins (verified/unverified)</div>
+        <div style="margin-left:auto" class="muted"><span id="statTotal">0</span> total · <span id="statActive">0</span> active(24h)</div>
       </div>
+      <div id="globe" class="globeWrap" style="margin-top:8px"></div>
+
+      <div class="feed" id="feed"></div>
     </div>
 
-    <div class="card" style="margin-top:12px;max-height:38vh;overflow:auto">
-      <div class="title"><div class="dot"></div> Leaderboard (Realtime)</div>
-      <table>
-        <thead><tr><th>Rank</th><th>Name</th><th>Email</th><th>Total</th><th>Active24</th><th>Offline</th><th>Fake</th><th>Active%</th><th>Score</th><th>Details</th></tr></thead>
-        <tbody id="leaderbody"><tr><td colspan="10" class="muted">Waiting…</td></tr></tbody>
-      </table>
+    <!-- right: leaderboard + controls -->
+    <div class="card">
+      <div style="display:flex;flex-direction:column;height:100%">
+        <div class="controls">
+          <select id="refSelect"><option value="">All Referrers</option></select>
+          <input id="search" placeholder="Search name or email">
+          <button id="refresh">Refresh</button>
+        </div>
+
+        <div style="flex:1;overflow:auto">
+          <table>
+            <thead><tr><th>Rank</th><th>Name</th><th>Email</th><th>Total</th><th>Active24</th><th>Offline</th><th>Fake</th><th>Active%</th><th>Score</th><th>Details</th></tr></thead>
+            <tbody id="leaderboardBody"><tr><td colspan="10" class="muted">Waiting for data…</td></tr></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:8px">
+          <canvas id="cpmChart" height="140"></canvas>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<div id="feed" class="feed"></div>
-
-<!-- Details modal -->
-<dialog id="detailsDlg">
-  <div style="padding:12px">
-    <div style="display:flex;align-items:center;gap:8px">
-      <strong id="dTitle">Details</strong>
-      <button id="dClose" style="margin-left:auto">Close</button>
+<!-- Settings dialog -->
+<dialog id="settingsDlg">
+  <div class="dlgHead"><strong>Settings - Firebase Config</strong><button id="closeSettings" style="margin-left:auto">Close</button></div>
+  <div class="dlgBody">
+    <textarea id="fbConfig" rows="8" style="width:100%;background:#021a1b;color:#bff;border-radius:6px;padding:8px"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="saveConfig">Save</button>
+      <div class="muted">Saved config stored in localStorage. Use only for convenience.</div>
     </div>
-    <div id="dSummary" class="small" style="margin-top:6px"></div>
-    <table style="width:100%;margin-top:8px"><thead><tr><th>Email</th><th>Verified</th><th>Country</th><th>IP</th><th>When</th><th>Active</th></tr></thead><tbody id="dBody"></tbody></table>
+  </div>
+</dialog>
+
+<!-- Details dialog -->
+<dialog id="detailsDlg">
+  <div class="dlgHead"><strong id="detailsTitle">Details</strong><button id="closeDetails" style="margin-left:auto">Close</button></div>
+  <div class="dlgBody">
+    <div id="detailsSummary" class="muted" style="margin-bottom:8px"></div>
+    <table style="width:100%"><thead><tr><th>Email</th><th>Verified</th><th>Country</th><th>IP</th><th>When</th><th>Active</th></tr></thead><tbody id="detailsBody"></tbody></table>
   </div>
 </dialog>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+/*
+  admin.html
+  - Realtime Firestore listener on "referrals"
+  - Expects docs shape:
+    { referrer, referrerRaw, email, verified (bool), ip, country, city, lat, lon, ua, score, ts }
+  - Uses validated lat/lon for globe points and builds arcs inviter -> invitee
+  - Responsive layout for mobile & desktop
+*/
 
-// ---------- Firebase config (use your project) ----------
-const firebaseConfig = {
+/* ---------- default Firebase config (your project) ---------- */
+const defaultConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
   projectId: "adwatchrewardsapp",
@@ -100,28 +150,41 @@ const firebaseConfig = {
   appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
   measurementId: "G-4NG2564HTK"
 };
-const app = initializeApp(firebaseConfig);
+
+/* ---------- UI refs ---------- */
+const loginBtn = document.getElementById('loginBtn'), userEl=document.getElementById('loginUser'), passEl=document.getElementById('loginPass');
+const loginCard=document.getElementById('loginCard'), dashboard=document.getElementById('dashboard');
+const leaderboardBody = document.getElementById('leaderboardBody'), feed = document.getElementById('feed');
+const statTotal = document.getElementById('statTotal'), statActive = document.getElementById('statActive');
+const refSelect = document.getElementById('refSelect'), searchEl = document.getElementById('search'), refreshBtn=document.getElementById('refresh');
+const exportCsv=document.getElementById('exportCsv');
+const detailsDlg=document.getElementById('detailsDlg'), detailsTitle=document.getElementById('detailsTitle'), detailsBody=document.getElementById('detailsBody'), detailsSummary=document.getElementById('detailsSummary');
+const settingsBtn=document.getElementById('settingsBtn'), settingsDlg=document.getElementById('settingsDlg'), fbConfigTA=document.getElementById('fbConfig'), saveConfigBtn=document.getElementById('saveConfig'), closeSettingsBtn=document.getElementById('closeSettings');
+const closeDetailsBtn=document.getElementById('closeDetails');
+
+/* ---------- settings load/save ---------- */
+const stored = localStorage.getItem('affiliate_firebase_config') || JSON.stringify(defaultConfig, null, 2);
+fbConfigTA.value = stored;
+settingsBtn.onclick = ()=> settingsDlg.showModal();
+closeSettingsBtn.onclick = ()=> settingsDlg.close();
+saveConfigBtn.onclick = ()=>{
+  try{
+    const obj = JSON.parse(fbConfigTA.value);
+    localStorage.setItem('affiliate_firebase_config', JSON.stringify(obj));
+    alert('Saved, reload to apply.');
+    location.reload();
+  }catch(e){ alert('Invalid JSON'); }
+};
+
+/* ---------- initialize firebase using stored config ---------- */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const cfg = JSON.parse(localStorage.getItem('affiliate_firebase_config') || JSON.stringify(defaultConfig));
+const app = initializeApp(cfg);
 const db = getFirestore(app);
 
-// ---------- Helpers ----------
-function niceTime(ts){ const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : new Date()); return d.toLocaleString(); }
-function isActive24(ts){ const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : new Date()); return (Date.now() - d.getTime()) <= 24*60*60*1000; }
-function regionScore(country){
-  const c=(country||"").toLowerCase(); if(["usa","united states","canada","uk"].some(x=>c.includes(x))) return 500;
-  if(["germany","france","italy","spain"].some(x=>c.includes(x))) return 370;
-  if(["uae","saudi","qatar"].some(x=>c.includes(x))) return 350; return 130;
-}
-
-// ---------- UI refs ----------
-const loginBtn = document.getElementById('loginBtn'), userEl = document.getElementById('user'), passEl = document.getElementById('pass');
-const loginCard = document.getElementById('loginCard'), main = document.getElementById('main');
-const leaderbody = document.getElementById('leaderbody'), feed = document.getElementById('feed');
-const refPick = document.getElementById('refPick'), search = document.getElementById('search'), exportCsv = document.getElementById('exportCsv');
-const detailsDlg = document.getElementById('detailsDlg'), dClose = document.getElementById('dClose'), dTitle = document.getElementById('dTitle'), dSummary = document.getElementById('dSummary'), dBody = document.getElementById('dBody');
-
-dClose.onclick = ()=> detailsDlg.close();
-
-// ---------- globe ----------
+/* ---------- globe setup ---------- */
 let gInstance;
 function buildGlobe(){
   if(gInstance) return gInstance;
@@ -131,17 +194,22 @@ function buildGlobe(){
     .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
     .backgroundColor("rgba(0,0,0,0)")
     .pointsData([])
-    .pointAltitude(0.02)
-    .pointColor(d=>d.color)
+    .pointAltitude(0.03)
+    .pointRadius(0.4)
+    .pointColor(d => d.color || "#39ff14")
+    .ringsData([])
+    .ringColor(() => t => `rgba(57,255,20,${1-t})`)
+    .ringMaxRadius(4)
+    .ringPropagationSpeed(2.5)
+    .ringRepeatPeriod(1000)
     .arcsData([])
-    .arcColor(a=>a.color)
     .arcDashLength(0.4)
     .arcDashGap(0.6)
-    .arcDashAnimateTime(4000)
-    .arcStroke(0.6);
+    .arcDashAnimateTime(3000)
+    .arcColor(a=>a.color || "#12e3ff")
+    .arcStroke(0.8);
   return gInstance;
 }
-
 function pulse(lat,lon,verified){
   if(!gInstance || lat==null || lon==null) return;
   const rings = gInstance.ringsData() || [];
@@ -150,11 +218,22 @@ function pulse(lat,lon,verified){
   gInstance.ringsData(rings);
 }
 
-// ---------- aggregate + render ----------
-let raw = [];
+/* ---------- helper utilities ---------- */
+function niceTime(ts){ const d = ts?.toDate ? ts.toDate() : (ts? new Date(ts) : new Date()); return d.toLocaleString(); }
+function isActive24(ts){ const d = ts?.toDate ? ts.toDate() : (ts? new Date(ts) : new Date()); return (Date.now()-d.getTime()) <= 24*60*60*1000; }
+function regionScore(country){
+  const c=(country||"").toLowerCase();
+  if(["usa","united states","canada","uk"].some(x=>c.includes(x))) return 500;
+  if(["germany","france","italy","spain","netherlands"].some(x=>c.includes(x))) return 370;
+  if(["uae","saudi","qatar","kuwait"].some(x=>c.includes(x))) return 350;
+  return 130;
+}
+
+/* ---------- realtime logic ---------- */
+let rawDocs = [];
 function aggregate(){
   const by = {};
-  raw.forEach(d=>{
+  rawDocs.forEach(d=>{
     const name = (d.referrer||"unknown").toLowerCase();
     if(!by[name]) by[name] = { name, email:"N/A", visits:[] };
     if(d.email && d.email!=="N/A" && by[name].email==="N/A") by[name].email = d.email;
@@ -162,17 +241,17 @@ function aggregate(){
   });
 
   const rows = [];
-  Object.values(by).forEach(r=>{
+  Object.values(by).forEach(entry=>{
     const ipCount = {}; let total=0, active=0, offline=0, fake=0, score=0; const countries={};
-    r.visits.forEach(v=>{
+    entry.visits.forEach(v=>{
       total++; if(isActive24(v.ts)) active++; else offline++;
       ipCount[v.ip || ""] = (ipCount[v.ip || ""]||0)+1;
-      const c = v.country || "Unknown"; countries[c] = (countries[c]||0)+1;
+      const c = v.country || "Unknown"; countries[c] = (countries[c]||0) + 1;
       score += (v.score || (10 + regionScore(c)));
     });
     Object.values(ipCount).forEach(n=>{ if(n>1) fake += (n-1); });
     const activePct = total ? Math.round(active/total*100) : 0;
-    rows.push({ name: r.name, email: r.email, total, active, offline, fake, activePct, score, visits: r.visits, countries });
+    rows.push({ name: entry.name, email: entry.email, total, active, offline, fake, activePct, score, visits: entry.visits, countries });
   });
 
   rows.sort((a,b)=>b.score - a.score);
@@ -181,110 +260,191 @@ function aggregate(){
 
 function render(){
   const rows = aggregate();
-  refPick.innerHTML = "<option value=''>All referrals…</option>" + rows.map(r=>`<option value="${r.name}">${r.name.toUpperCase()}</option>`).join("");
-  const term = (search.value || "").toLowerCase();
-  const list = rows.filter(r => r.name.includes(term));
-  leaderbody.innerHTML = list.length ? list.map((r,i)=>`
-    <tr>
-      <td>${i+1}${i===0?'<span class="pill">TOP</span>':''}</td>
-      <td>${r.name.toUpperCase()}</td>
-      <td>${r.email}</td>
-      <td>${r.total}</td>
-      <td>${r.active}</td>
-      <td>${r.offline}</td>
-      <td>${r.fake}</td>
-      <td><span class="pill">${r.activePct}%</span></td>
-      <td>${r.score}</td>
-      <td><button class="det" data-name="${r.name}">Details</button></td>
-    </tr>
-  `).join("") : `<tr><td colspan="10" class="muted">No data</td></tr>`;
 
-  document.querySelectorAll(".det").forEach(b=>{
-    b.onclick = ()=>{
-      const name = b.dataset.name;
+  // update header stats
+  const total = rawDocs.length;
+  const activeCount = rawDocs.filter(d => isActive24(d.ts)).length;
+  statTotal.textContent = total;
+  statActive.textContent = activeCount;
+
+  // fill ref select
+  refSelect.innerHTML = "<option value=''>All Referrers</option>" + rows.map(r=>`<option value="${r.name}">${r.name.toUpperCase()}</option>`).join("");
+
+  // filter
+  const q = (searchEl.value || "").toLowerCase();
+  const list = rows.filter(r => r.name.includes(q) || (r.email||"").toLowerCase().includes(q));
+  if(list.length===0) {
+    leaderboardBody.innerHTML = `<tr><td colspan="10" class="muted">No data</td></tr>`;
+  } else {
+    leaderboardBody.innerHTML = list.map((r,i)=>`
+      <tr>
+        <td>${i+1}${i===0? ' <span class="badge">TOP</span>': ''}</td>
+        <td>${r.name.toUpperCase()}</td>
+        <td>${r.email}</td>
+        <td>${r.total}</td>
+        <td>${r.active}</td>
+        <td>${r.offline}</td>
+        <td>${r.fake}</td>
+        <td><span class="pill">${r.activePct}%</span></td>
+        <td>${r.score}</td>
+        <td><button class="detBtn" data-name="${r.name}">Details</button></td>
+      </tr>
+    `).join("");
+  }
+
+  // attach detail handlers
+  document.querySelectorAll('.detBtn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const name = btn.dataset.name;
       const r = rows.find(x=>x.name===name);
       if(!r) return;
-      dTitle.textContent = `Details — ${name.toUpperCase()}`;
-      dSummary.textContent = Object.entries(r.countries).map(([c,n])=>`${c}: ${n}`).join(' · ');
-      dBody.innerHTML = r.visits.map(v=>`<tr><td>${v.email||'N/A'}</td><td>${v.verified? 'Yes':'No'}</td><td>${v.country||'N/A'}</td><td>${v.ip||'N/A'}</td><td>${niceTime(v.ts)}</td><td>${isActive24(v.ts)?'Yes':'No'}</td></tr>`).join('');
+      detailsTitle.textContent = `Details — ${name.toUpperCase()}`;
+      detailsSummary.textContent = Object.entries(r.countries).map(([c,n])=>`${c}: ${n}`).join(' · ');
+      detailsBody.innerHTML = r.visits.map(v=>`<tr>
+        <td>${v.email || 'N/A'}</td>
+        <td>${v.verified ? 'Yes' : 'No'}</td>
+        <td>${v.country || 'Unknown'}</td>
+        <td>${v.ip || 'N/A'}</td>
+        <td>${niceTime(v.ts)}</td>
+        <td>${isActive24(v.ts)?'Yes':'No'}</td>
+      </tr>`).join('');
       detailsDlg.showModal();
 
-      // focus globe to this referrer with arcs & points
+      // focus globe on this referrer's points and draw arcs (inviter -> invitee)
       const pts = r.visits.filter(v=>v.lat!=null && v.lon!=null).map(v=>({lat:v.lat,lng:v.lon,size:0.9,color:v.verified?"#39ff14":"#12e3ff"}));
       gInstance.pointsData(pts);
 
-      // show arcs: if inviter exists (we look for docs where email matches and get inviter lat)
-      // build arcs for this referrer: for each visit, try to find inviter location from raw
+      // arcs: inviter location -> each invite
       const arcs = [];
+      // find inviter location (if exists among raw docs)
+      const inviterLoc = rawDocs.find(d => (d.referrer||'').toLowerCase() === name && d.lat!=null && d.lon!=null);
       r.visits.forEach(v=>{
-        // find the inviter doc in raw by referrer name? we use v.referrerRaw?
-        // here we try: find an inviter doc where doc.id? fallback: draw small pulse only
+        if(inviterLoc && v.lat!=null && v.lon!=null){
+          arcs.push({
+            startLat: inviterLoc.lat, startLng: inviterLoc.lon,
+            endLat: v.lat, endLng: v.lon,
+            color: v.verified ? '#39ff14' : '#12e3ff'
+          });
+        }
       });
-      // (arc drawing from inviter → invitee requires having inviter lat/lon known in docs; main dataset raw contains that)
-      // We'll draw arcs globally in the main realtime loop below where inviter relationships are found.
+      gInstance.arcsData(arcs);
+      updateCPMChart(r);
     };
   });
 
-  // update CPM chart total (simple)
-  const totals = rows.reduce((acc,r)=>{ acc.totalScore=(acc.totalScore||0)+r.score; return acc; }, {});
-  // (we can compute buckets per country for chart; omitted for brevity)
+  // update global CPM chart (sum buckets)
+  const totals = rows.reduce((acc, r) => {
+    // sum by region by recomputing quickly
+    Object.entries(r.countries || {}).forEach(([c,n]) => {
+      const rs = regionScore(c);
+      if(rs===500) acc.premium += n*(10+rs);
+      else if(rs===370) acc.europe += n*(10+rs);
+      else if(rs===350) acc.me += n*(10+rs);
+      else acc.asia += n*(10+rs);
+    });
+    return acc;
+  }, {premium:0,europe:0,me:0,asia:0});
+  updateCPMChart(totals);
 }
 
-// ---------- realtime snapshot ----------
+/* ---------- chart ---------- */
+let barChart;
+function updateCPMChart(buckets){
+  const ctx = document.getElementById('cpmChart').getContext('2d');
+  const labels = ["Premium (US/CA/UK)", "Europe", "Middle East", "Asia/Other"];
+  const data = [buckets.premium||0, buckets.europe||0, buckets.me||0, buckets.asia||0];
+  if(barChart){ barChart.data.datasets[0].data = data; barChart.update(); return; }
+  barChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label:'CPM Score', data, backgroundColor:['#19ff5f','#12e3ff','#ffd166','#7af0b8'] }]},
+    options: { plugins:{ legend:{ display:false }}, scales:{ x:{ ticks:{ color:'#bff' }}, y:{ ticks:{ color:'#bff' } } } }
+  });
+}
+
+/* ---------- realtime snapshot ---------- */
+import { collection as coll } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+const col = coll(db, "referrals");
+import { onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+let gInstance;
 function startRealtime(){
   gInstance = buildGlobe();
 
-  const col = collection(db,'referrals');
-  onSnapshot(col, snap=>{
-    raw = snap.docs.map(d=>d.data());
-    // compute globe points (all validated docs with lat/lon)
-    const pts = raw.filter(v=>v.lat!=null && v.lon!=null).slice(-1000).map(v=>({lat:v.lat,lng:v.lon,size:0.6,color:v.verified?"#39ff14":"#12e3ff"}));
+  onSnapshot(col, snap => {
+    rawDocs = snap.docs.map(d => {
+      const data = d.data();
+      // normalize fields (some older docs may lack lat/lon)
+      return {
+        ...data,
+        referrer: (data.referrer || data.referrerRaw || "unknown").toString().toLowerCase(),
+        email: data.email || "N/A",
+        verified: !!data.verified,
+        ip: data.ip || "",
+        country: data.country || "",
+        lat: data.lat || null,
+        lon: data.lon || null,
+        score: Number(data.score || 0),
+        ts: data.ts || data.server_ts || null
+      };
+    });
+
+    // points
+    const pts = rawDocs.filter(d => d.lat!=null && d.lon!=null).slice(-1000).map(v=>({ lat: v.lat, lng: v.lon, size: 0.6, color: v.verified ? '#39ff14' : '#12e3ff' }));
     gInstance.pointsData(pts);
 
-    // construct arcs: for each visit where referrer has a lat/lon, draw arc from referrer location to this visit
+    // arcs: inviter -> invitee
     const arcs = [];
-    const byRef = {};
-    raw.forEach(v => { const n = (v.referrer||"unknown").toLowerCase(); if(!byRef[n]) byRef[n]=[]; byRef[n].push(v); });
-    // build a small map of latest referrer location (we assume a referrer may have at least one visit doc with lat/lon)
+    // build quick map of a referrer's latest location
     const refLoc = {};
-    Object.keys(byRef).forEach(name=>{
-      const docs = byRef[name].filter(x => x.lat!=null && x.lon!=null);
-      if(docs.length) refLoc[name] = {lat: docs[0].lat, lon: docs[0].lon}; // pick first found
+    rawDocs.forEach(d => {
+      if(d.lat!=null && d.lon!=null){
+        const name = d.referrer;
+        if(!refLoc[name]) refLoc[name] = { lat: d.lat, lon: d.lon };
+      }
     });
-    raw.forEach(v=>{
-      const inviter = (v.referrer||"").toLowerCase();
-      if(refLoc[inviter] && v.lat!=null && v.lon!=null){
+    rawDocs.forEach(d => {
+      const inviter = (d.referrer || "unknown").toLowerCase();
+      // find the inviter's location among refLoc (if inviter invited others, use that)
+      // We treat referrer as inviter name (same doc shape). If you store inviter id separately, adapt here.
+      // For arcs we try: if there exists a doc whose referrer equals inviter, but that may not be direct mapping.
+      // Simpler approach: if a doc has a 'invitedBy' field, use it for arcs (not present here).
+      // We'll create arcs from refLoc[inviter] -> this doc location when possible:
+      if(refLoc[inviter] && d.lat!=null && d.lon!=null && (refLoc[inviter].lat !== d.lat && refLoc[inviter].lon !== d.lon)){
         arcs.push({
-          startLat: refLoc[inviter].lat,
-          startLng: refLoc[inviter].lon,
-          endLat: v.lat,
-          endLng: v.lon,
-          color: v.verified ? '#39ff14' : '#12e3ff'
+          startLat: refLoc[inviter].lat, startLng: refLoc[inviter].lon,
+          endLat: d.lat, endLng: d.lon,
+          color: d.verified ? '#39ff14' : '#12e3ff'
         });
       }
     });
     gInstance.arcsData(arcs);
 
-    // pulse recent docs (<8s) and push to feed
-    raw.forEach(v=>{
+    // show pulses for recent joins (<8s)
+    rawDocs.forEach(v => {
       const t = v.ts?.toDate ? v.ts.toDate().getTime() : (v.ts ? new Date(v.ts).getTime() : 0);
-      if(Date.now() - t < 8000){ pulse(v.lat, v.lon, v.verified); pushFeed(v); }
+      if(Date.now() - t < 8000 && v.lat!=null && v.lon!=null){
+        pulse(v.lat, v.lon, v.verified);
+        pushFeed(v);
+      }
     });
 
     render();
   });
 }
 
-// feed
+/* ---------- feed UI ---------- */
 function pushFeed(v){
-  const row = document.createElement('div');
-  row.className = 'feed-row';
-  row.innerHTML = `<div>${v.email && v.email!=='N/A' ? v.email : '<span class="muted">Unknown</span>'}</div><div>${v.country||'<span class="muted">Unknown</span>'}</div><div>${v.ip||'N/A'}</div><div>${(v.referrer||'unknown').toUpperCase()}</div>`;
-  feed.prepend(row);
-  while(feed.children.length>120) feed.removeChild(feed.lastChild);
+  const el = document.createElement('div');
+  el.className = 'feedRow';
+  el.innerHTML = `<div>${(v.email && v.email!=="N/A") ? v.email : '<span class="muted">Unknown</span>'}</div>
+                  <div>${v.country || '<span class="muted">Unknown</span>'}</div>
+                  <div>${v.ip || 'N/A'}</div>
+                  <div>${(v.referrer||'unknown').toUpperCase()}</div>`;
+  feed.prepend(el);
+  while(feed.children.length > 120) feed.removeChild(feed.lastChild);
 }
 
-// CSV export
+/* ---------- CSV export ---------- */
 exportCsv.onclick = ()=>{
   const rows = aggregate();
   let csv = 'Rank,Name,Email,Total,Active24,Offline,Fake,Active%,Score\n';
@@ -292,25 +452,32 @@ exportCsv.onclick = ()=>{
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download = 'leaderboard.csv'; a.click();
 };
 
-// interactions
+/* ---------- interactions ---------- */
 loginBtn.onclick = ()=>{
   if(userEl.value.trim()==='admin' && passEl.value.trim()==='nadeem'){
-    loginCard.style.display='none'; main.style.display='block';
+    loginCard.style.display = 'none';
+    dashboard.style.display = 'grid';
     startRealtime();
   } else alert('Wrong credentials');
 };
-search.addEventListener('input', render);
-refPick.addEventListener('change', (e)=> {
-  const pick = (e.target.value||'').toLowerCase();
+closeDetailsBtn.onclick = ()=> detailsDlg.close();
+refreshBtn.onclick = ()=> render();
+searchEl.addEventListener('input', render);
+refSelect.addEventListener('change', (e)=>{
+  const pick = (e.target.value||"").toLowerCase();
   if(!pick){
-    const pts = raw.filter(v=>v.lat!=null && v.lon!=null).slice(-800).map(v=>({lat:v.lat,lng:v.lon,size:0.6,color:v.verified?"#39ff14":"#12e3ff"}));
-    gInstance.pointsData(pts); gInstance.arcsData([]);
-  } else {
-    const pts = raw.filter(v=> (v.referrer||'').toLowerCase()===pick && v.lat!=null && v.lon!=null).map(v=>({lat:v.lat,lng:v.lon,size:0.9,color:v.verified?"#39ff14":"#12e3ff"}));
+    const pts = rawDocs.filter(v=>v.lat!=null && v.lon!=null).slice(-800).map(v=>({lat:v.lat,lng:v.lon,size:0.6,color:v.verified?"#39ff14":"#12e3ff"}));
     gInstance.pointsData(pts);
-    // arcs for this referrer handled in onSnapshot if needed
+    gInstance.arcsData([]);
+  } else {
+    const pts = rawDocs.filter(v=> (v.referrer||"").toLowerCase()===pick && v.lat!=null && v.lon!=null).map(v=>({lat:v.lat,lng:v.lon,size:0.9,color:v.verified?"#39ff14":"#12e3ff"}));
+    gInstance.pointsData(pts);
+    // optionally draw arcs for this referrer (done in details click)
   }
 });
+
+/* ---------- start ---------- */
+gInstance = buildGlobe();
 </script>
 </body>
 </html>
