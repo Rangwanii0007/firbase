@@ -2757,15 +2757,14 @@
 
 
 
-<!-- ===== Referral tracker (paste at end of <body>) ===== -->
+<!-- ======= Referral tracker (paste just before </body>) ======= -->
 <script type="module">
 /*
-  Lightweight tracker:
-  - writes provisional doc to Firestore collection "referrals"
-  - calls VERIFY URL (Cloud Function) to let server read real client IP and write authoritative geo/score/verified
-  - respects session + IP rate-limit
-  - reads optional email input on page (if present)
-  Replace VALIDATE_URL with your deployed Cloud Function endpoint.
+  Referral tracker (client-side)
+  - write provisional doc to Firestore collection "referrals"
+  - call Cloud Function to do server-side validation (reads client IP & geo)
+  - prevents duplicate write per session
+  - optional email capture from a page input (if present)
 */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
@@ -2783,81 +2782,84 @@ const firebaseConfig = {
   measurementId: "G-4NG2564HTK"
 };
 
-// Initialize
+// initialize
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Replace with your deployed function URL after you deploy it
-const VALIDATE_URL = "https://us-central1-YOUR_PROJECT.cloudfunctions.net/api/validate"; // <- REPLACE
+// ***** IMPORTANT: set this to your deployed Cloud Function URL *****
+const VALIDATE_URL = "https://us-central1-YOUR_PROJECT.cloudfunctions.net/api/validate"; // <-- replace this after deploying the function
 
 // helpers
-const query = new URLSearchParams(location.search);
-const refRaw = (query.get('ref') || "").trim();
+const params = new URLSearchParams(location.search);
+const refRaw = (params.get('ref') || "").trim();
 const ref = refRaw ? refRaw.toLowerCase() : "";
-const SESSION_KEY = (r) => `ref_session_${r}`;
-const IP_KEY = (r, ip) => `ref_ip_${r}_${ip}`;
-const RATE_MS = 10*60*1000; // 10 minutes
+const SESSION_KEY = r => `aff_ref_sess_${r}`;
 
-// handle email link sign-in completion (if you use email verification)
-(async function completeEmailLink(){
+// handle incoming email-link completion (if you use email verification)
+(async function maybeCompleteLink(){
   try{
     if(isSignInWithEmailLink(auth, window.location.href)){
-      let email = window.localStorage.getItem('emailForSignIn');
-      if(!email) email = prompt("Confirm email to finish verification:");
+      let email = window.localStorage.getItem('emailForSignIn') || prompt("Confirm your email to finish verification:");
       if(!email) return;
       await signInWithEmailLink(auth, email, window.location.href);
       window.localStorage.removeItem('emailForSignIn');
       console.log("Email verification completed.");
     }
-  }catch(e){ console.warn("Email link completion error:", e); }
+  }catch(e){ console.warn("Email link finish error:", e); }
 })();
 
-async function createProvisionalDoc(data){
-  return await addDoc(collection(db,'referrals'), data);
+// quick geo attempt (client side fallback) - not relied on for security
+async function fetchBasicGeo(){
+  try{
+    const r = await fetch("https://ipapi.co/json/");
+    if(!r.ok) throw new Error("geo fail");
+    return await r.json();
+  }catch(e){ return {}; }
 }
 
-// main
-(async function track(){
-  if(!ref) return;
-  // session guard to avoid double log on refresh
+(async function trackReferral(){
+  if(!ref) return; // nothing to do if no ?ref=
+
+  // session guard prevents multiple writes from same tab reload
   if(sessionStorage.getItem(SESSION_KEY(ref))) return;
   sessionStorage.setItem(SESSION_KEY(ref), "1");
 
-  // optional email entry on page (non-blocking)
+  // optional email input on page (non-blocking)
   let email = "";
   const emailInput = document.querySelector('input[type="email"], input[name="email"], #email');
-  if(emailInput && emailInput.value) email = (emailInput.value || "").trim();
+  if(emailInput && emailInput.value) email = (emailInput.value||"").trim();
 
-  // create provisional doc (server will fill ip/country/lat/lon/verified/score later)
+  // create provisional doc
   let docRef;
   try{
-    docRef = await createProvisionalDoc({
+    docRef = await addDoc(collection(db, 'referrals'), {
       referrer: ref,
       referrerRaw: refRaw,
       email: email || "N/A",
       verified: false,
       ua: navigator.userAgent || "",
       ts: serverTimestamp()
+      // server will later update ip, country, lat, lon, verified, score, server_ts
     });
   }catch(err){
-    console.error("Failed to write provisional doc:", err);
+    console.error("Failed to write provisional referral doc:", err);
     return;
   }
 
-  // call server to validate (server reads client IP and updates the doc)
+  // call server validation (server reads IP from request headers)
   try{
     await fetch(VALIDATE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ docId: docRef.id })
     });
-    // Admin listens to Firestore — updated doc will appear there
   }catch(err){
-    console.warn("Server validation call failed (replace VALIDATE_URL after deploying function):", err);
+    console.warn("Server validation call failed (check VALIDATE_URL)", err);
+    // Admin will still see provisional doc until function updates it.
   }
 
-  // if email present, optionally send magic link (requires Email Link enabled in Firebase Auth)
+  // optional: if email entered, send magic link for verification (requires Email Link enabled in Firebase Auth console)
   if(email){
     try{
       const actionCodeSettings = {
@@ -2866,14 +2868,13 @@ async function createProvisionalDoc(data){
       };
       await sendSignInLinkToEmail(auth, email, actionCodeSettings);
       window.localStorage.setItem('emailForSignIn', email);
-      console.log("Verification link sent to:", email);
-    }catch(e){
-      console.warn("Could not send verification link:", e);
-    }
+      // do not block the visitor
+    }catch(e){ console.warn("Failed to send email link:", e); }
   }
 })();
 </script>
-<!-- ===== end tracker ===== -->
+<!-- ======= end tracker ======= -->
+
 
     
 
