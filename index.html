@@ -2754,12 +2754,14 @@
         });
     </script>
 //TREAKCER
-<!-- Referral Tracker Script -->
+
+
+    <!-- Referral Tracking – paste near the end of <body> -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-// ----- Firebase Config -----
+// --- Firebase (your project) ---
 const firebaseConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
@@ -2769,66 +2771,62 @@ const firebaseConfig = {
   appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
   measurementId: "G-4NG2564HTK"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- Get referral from URL ---
-const urlParams = new URLSearchParams(window.location.search);
-let refName = urlParams.get('ref') || 'unknown';
-
-// Optional: Ask visitor email
-let visitorEmail = prompt("Enter your email (optional for tracking):");
-
-// Get visitor IP & country via free API
-async function getVisitorInfo() {
-  try {
-    const res = await fetch('https://ipapi.co/json/');
-    const data = await res.json();
+// --- Helpers ---
+function getParam(name){
+  const p = new URLSearchParams(window.location.search).get(name);
+  return p ? p.trim() : "";
+}
+async function getVisitor(){
+  try{
+    const res = await fetch("https://ipapi.co/json/");
+    const j = await res.json();
     return {
-      ip: data.ip || 'unknown',
-      country: data.country_name || 'unknown'
+      ip: j.ip || "",
+      country: j.country_name || "",
+      city: j.city || "",
+      region: j.region || ""
     };
-  } catch (e) {
-    return { ip: 'unknown', country: 'unknown' };
+  }catch(e){
+    return { ip:"", country:"", city:"", region:"" };
   }
 }
+function oncePerSessionKey(ref){ return "ref_logged_"+ref; }
 
-async function recordReferral() {
-  const info = await getVisitorInfo();
+// --- Main tracking ---
+(async function track(){
+  const refRaw = getParam("ref");
+  if(!refRaw) return; // only log if ?ref= is present
+  const referrer = refRaw.toLowerCase();
 
-  // Check duplicate (same IP or email)
-  const q = query(collection(db, "referrals"), 
-                  where("refName", "==", refName),
-                  where("email", "==", visitorEmail || ''));
-  const existing = await getDocs(q);
+  // prevent double-count on page refresh in the same tab
+  const key = oncePerSessionKey(referrer);
+  if(sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key,"1");
 
-  let isFake = existing.size > 0;
+  // try to grab an email if your page already has one in a form
+  // (non-blocking; if not found, it stays "")
+  let email = "";
+  const emailInput = document.querySelector('input[type="email"], input[name="email"], #email');
+  if(emailInput && emailInput.value) email = (emailInput.value || "").trim();
 
-  // Calculate CPM score per country
-  let countryScore = 0;
-  const country = info.country;
-  if(['USA','Canada','UK','Germany','France'].includes(country)) countryScore = 370;
-  else if(['UAE','Saudi Arabia','Qatar','Kuwait'].includes(country)) countryScore = 350;
-  else countryScore = 130; // Asia / others
+  const v = await getVisitor();
 
-  const baseScore = 10;
-
-  await addDoc(collection(db, "referrals"), {
-    refName,
-    email: visitorEmail || 'N/A',
-    ip: info.ip,
-    country: info.country,
-    timestamp: new Date().toISOString(),
-    fake: isFake,
-    score: baseScore + countryScore
-  });
-
-  console.log("Referral recorded for", refName, "Score:", baseScore + countryScore);
-}
-
-// Execute
-recordReferral();
+  // Create one visit doc (per visit)
+  await addDoc(collection(db,"referrals"),{
+    referrer,          // normalized (lowercase)
+    referrerRaw: refRaw, // original casing
+    email,             // optional
+    ip: v.ip,
+    country: v.country,
+    city: v.city,
+    region: v.region,
+    ua: navigator.userAgent,
+    ts: serverTimestamp()
+  }).catch(console.error);
+})();
 </script>
 
 </body>
