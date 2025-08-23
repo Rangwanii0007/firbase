@@ -2756,117 +2756,100 @@
 //TREAKCER
 
 
-<!-- ===== Referral tracker (paste at end of <body>) ===== -->
-<script type="module">
-/*
- * Simple referral tracker (client-side GeoIP).
- * - writes a doc to Firestore collection "referrals"
- * - fields: referrer, email, ip (from ipapi), country, city, lat, lon, ua, ts
- * - rate-limit: session + localStorage per ref+ip for 10 minutes
- *
- * Paste in your index.html just before </body>
- */
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script>
+    // Your Firebase configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyEXAMPLE-12345",
+        authDomain: "your-project.firebaseapp.com",
+        databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+        projectId: "your-project",
+        storageBucket: "your-project.appspot.com",
+        messagingSenderId: "123456789",
+        appId: "1:123456789:web:abcdef12345"
+    };
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-import { getAuth, isSignInWithEmailLink, signInWithEmailLink, sendSignInLinkToEmail } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
 
-// --- FIREBASE CONFIG (your project) ---
-const firebaseConfig = {
-  apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
-  authDomain: "adwatchrewardsapp.firebaseapp.com",
-  projectId: "adwatchrewardsapp",
-  storageBucket: "adwatchrewardsapp.firebasestorage.app",
-  messagingSenderId: "782268735936",
-  appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
-  measurementId: "G-4NG2564HTK"
-};
-
-// init
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-// helpers
-const params = new URLSearchParams(location.search);
-const refRaw = (params.get('ref') || "").trim();
-const ref = refRaw ? refRaw.toLowerCase() : "";
-const SESSION_KEY = r => `aff_sess_${r}`;
-const RATE_KEY = (r, ip) => `aff_ip_${r}_${ip}`;
-const RATE_MS = 10 * 60 * 1000; // 10 minutes
-
-// optional: complete email link sign-in if user clicked verification link
-(async function maybeCompleteEmailSignIn(){
-  try{
-    if(isSignInWithEmailLink(auth, window.location.href)){
-      let email = window.localStorage.getItem('emailForSignIn');
-      if(!email) email = prompt("Enter email you used to verify:");
-      if(email) await signInWithEmailLink(auth, email, window.location.href);
-      window.localStorage.removeItem('emailForSignIn');
+    // Function to get a URL parameter
+    function getUrlParameter(name) {
+        name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+        const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+        const results = regex.exec(location.search);
+        return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
     }
-  }catch(e){ console.warn("Email sign-in finish error:", e); }
-})();
 
-// fetch geo info (client-side fallback)
-async function fetchGeo(){
-  try{
-    const res = await fetch("https://ipapi.co/json/");
-    if(!res.ok) throw new Error("geo failed");
-    return await res.json();
-  }catch(e){
-    return {};
-  }
-}
+    // Get the referrer's name from the URL
+    const referrerName = getUrlParameter('ref');
+    const userIP = sessionStorage.getItem('userIP');
 
-(async function track(){
-  if(!ref) return; // only log when ?ref= present
-  if(sessionStorage.getItem(SESSION_KEY(ref))) return; // don't double-log on refresh
-  sessionStorage.setItem(SESSION_KEY(ref), "1");
-
-  // optional email on page (non-blocking)
-  let email = "";
-  const emailEl = document.querySelector('input[type="email"], input[name="email"], #email');
-  if(emailEl && emailEl.value) email = (emailEl.value||"").trim();
-
-  // get geo (client)
-  const geo = await fetchGeo();
-  const ip = geo.ip || "";
-  // local rate-limit by ip+ref
-  const last = Number(localStorage.getItem(RATE_KEY(ref, ip)) || "0");
-  if(Date.now() - last < RATE_MS) return; // too soon from same ip+ref
-  localStorage.setItem(RATE_KEY(ref, ip), String(Date.now()));
-
-  // create doc
-  try{
-    await addDoc(collection(db, "referrals"), {
-      referrer: ref,
-      referrerRaw: refRaw,
-      email: email || "N/A",
-      ip: ip || "",
-      country: geo.country_name || geo.country_name || geo.country || "",
-      city: geo.city || "",
-      region: geo.region || "",
-      lat: geo.latitude || geo.lat || null,
-      lon: geo.longitude || geo.lon || null,
-      ua: navigator.userAgent || "",
-      verified: false, // can be set true by server later if you use Cloud Function
-      score: 0,
-      ts: serverTimestamp()
-    });
-    // optionally send email magic link for verification (requires enabling Email Link sign-in)
-    if(email){
-      try{
-        const actionCodeSettings = { url: `${location.origin}${location.pathname}?ref=${encodeURIComponent(refRaw)}`, handleCodeInApp:true };
-        await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-        window.localStorage.setItem('emailForSignIn', email);
-      }catch(e){ /* non-fatal */ }
+    if (referrerName && !userIP) {
+        // Fetch user IP and country on the first visit
+        fetch('https://api.ipify.org?format=json')
+            .then(response => response.json())
+            .then(data => {
+                const ip = data.ip;
+                sessionStorage.setItem('userIP', ip);
+                fetch(`https://ipapi.co/${ip}/json/`)
+                    .then(response => response.json())
+                    .then(geoData => {
+                        const userCountry = geoData.country_name || 'Unknown';
+                        const timestamp = new Date().toISOString();
+                        
+                        // Save the referral data to Firebase
+                        const newInviteRef = database.ref('invited_users').push();
+                        newInviteRef.set({
+                            invited_by: referrerName.toUpperCase(),
+                            ip_address: ip,
+                            country: userCountry,
+                            status: 'Invited',
+                            timestamp: timestamp,
+                            isFake: false
+                        });
+                        
+                        console.log('Referral tracked for:', referrerName, 'from', userCountry);
+                    })
+                    .catch(error => {
+                        console.error('IP lookup failed:', error);
+                    });
+            })
+            .catch(error => {
+                console.error('IP detection failed:', error);
+            });
     }
-  }catch(err){
-    console.error("Write to Firestore failed:", err);
-  }
-})();
+
+    // Example function to call on successful user signup/account creation
+    // You should integrate this with your actual signup logic.
+    function onUserAccountCreated(userId) {
+        const userRef = database.ref('invited_users').orderByChild('ip_address').equalTo(sessionStorage.getItem('userIP')).limitToLast(1);
+        userRef.once('value', snapshot => {
+            snapshot.forEach(childSnapshot => {
+                const userKey = childSnapshot.key;
+                const userData = childSnapshot.val();
+
+                // Check for duplicate IPs (potential fake user)
+                database.ref('invited_users').orderByChild('ip_address').equalTo(userData.ip_address).once('value', ipSnapshot => {
+                    const isFake = ipSnapshot.numChildren() > 1;
+
+                    // Update the user's status to 'ACTIVE' and set fake status
+                    database.ref('invited_users/' + userKey).update({
+                        status: 'ACTIVE',
+                        userId: userId,
+                        isFake: isFake
+                    });
+                    
+                    console.log('User status updated to ACTIVE.');
+                });
+            });
+        });
+    }
+
+    // Call this function when a new user signs up on your website.
+    // onUserAccountCreated('unique_user_id'); // Example call
 </script>
-<!-- ===== end tracker ===== -->
 
 
 
