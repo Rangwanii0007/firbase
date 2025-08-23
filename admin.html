@@ -3,132 +3,106 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Affiliate Command Center — Hacker Mode</title>
-
-<!-- Three.js + Globe + Chart.js -->
-<script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
-<script src="https://unpkg.com/globe.gl"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+<title>Affiliate Admin — Classic</title>
 <style>
-  :root{
-    --bg:#00060b; --panel:#021617; --neon:#00ff7a; --accent:#12e3ff; --muted:#89cbb8;
-  }
+  :root{ --bg:#0b0f12; --panel:#071014; --accent:#00d48a; --muted:#7fbfb0; --card:#071a1a; }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:linear-gradient(180deg,#000,#001217);color:#c8ffe3;font-family:ui-monospace,monospace;overflow:hidden}
-  .container{max-width:1400px;margin:12px auto;padding:12px;display:flex;flex-direction:column;gap:12px}
-  .topbar{display:flex;align-items:center;gap:12px}
-  .title{display:flex;align-items:center;gap:10px;font-weight:900}
-  .dot{width:10px;height:10px;border-radius:50%;background:var(--neon);box-shadow:0 0 10px var(--neon)}
-  .loginCard{background:linear-gradient(180deg,#011215,#002028);border-radius:10px;padding:12px;border:1px solid rgba(0,255,122,.06)}
-  .mainGrid{display:grid;grid-template-columns:1fr 420px;gap:12px;align-items:start}
-  .card{background:linear-gradient(180deg,#00161b,#001a22);border-radius:12px;padding:12px;border:1px solid rgba(10,30,30,0.6);box-shadow:0 12px 40px rgba(0,255,122,0.02)}
-  .globeWrap{height:62vh;border-radius:10px;overflow:hidden}
-  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  input,select,button{background:#00161d;border:1px solid #0b3a44;color:#bff;border-radius:8px;padding:8px}
+  body{margin:0;background:linear-gradient(180deg,#000,#07121a);color:#d9fff0;font-family:ui-monospace,monospace}
+  .wrap{max-width:1200px;margin:14px auto;padding:12px}
+  .login{background:var(--card);padding:12px;border-radius:8px;display:flex;gap:8px;align-items:center}
+  input,button,select{background:#021617;border:1px solid rgba(0,212,138,0.12);color:#dff; padding:8px;border-radius:6px}
   button{cursor:pointer}
-  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
-  thead th{position:sticky;top:0;background:#00161d;padding:8px;text-align:center;border-bottom:1px solid #0a3a44}
-  td,th{padding:8px;border-bottom:1px solid #0c3940;text-align:center}
+  .grid{display:grid;grid-template-columns:1fr 380px;gap:12px;margin-top:12px}
+  .card{background:linear-gradient(180deg,#001a1a,#021e22);padding:12px;border-radius:8px;border:1px solid rgba(0,212,138,0.06)}
+  .title{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);text-align:center}
+  thead th{background:rgba(0,0,0,0.25);position:sticky;top:0}
   .muted{color:var(--muted);font-size:13px}
-  .feed{height:22vh;overflow:auto;border-top:1px solid rgba(10,30,30,0.4);padding-top:8px;margin-top:8px}
-  .feedRow{display:grid;grid-template-columns:1fr .6fr .6fr .5fr;gap:8px;padding:6px 0;border-bottom:1px dashed rgba(10,30,30,0.4)}
-  .pill{padding:4px 8px;border-radius:999px;background:rgba(0,255,122,0.06)}
-  .badge{padding:3px 7px;border-radius:7px;background:var(--neon);color:#001;font-weight:700}
-  dialog{border:none;border-radius:10px;background:#02181a;color:#c8ffe3;padding:0}
-  .dlgHead{display:flex;align-items:center;padding:10px;border-bottom:1px solid rgba(10,30,30,0.4)}
-  .dlgBody{padding:10px;max-height:60vh;overflow:auto}
-  @media (max-width:900px){
-    .mainGrid{grid-template-columns:1fr;grid-auto-rows:auto}
-    .globeWrap{height:50vh}
-  }
+  .feed{margin-top:8px;max-height:200px;overflow:auto;border-top:1px solid rgba(255,255,255,0.02);padding-top:8px}
+  .feedRow{display:flex;gap:8px;justify-content:space-between;padding:6px 0;border-bottom:1px dashed rgba(0,0,0,0.2)}
+  @media(max-width:900px){ .grid{grid-template-columns:1fr} .card{padding:10px} table td,table th{padding:6px;font-size:12px} }
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="topbar">
-    <div class="title"><div class="dot"></div> Affiliate Command Center</div>
-    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-      <div class="muted">Realtime</div>
-      <button id="exportCsv">Export CSV</button>
-      <button id="settingsBtn">Settings</button>
-    </div>
+<div class="wrap">
+  <div class="title"><div class="dot"></div> Affiliate Admin — Classic</div>
+
+  <!-- login -->
+  <div id="loginCard" class="login">
+    <input id="user" placeholder="username" value="admin">
+    <input id="pass" placeholder="password" type="password">
+    <button id="loginBtn">Open Dashboard</button>
+    <div style="margin-left:auto" class="muted">Hint: admin / nadeem</div>
   </div>
 
-  <!-- Login -->
-  <div id="loginCard" class="loginCard card" style="max-width:700px">
-    <div style="display:flex;gap:8px;align-items:center">
-      <input id="loginUser" placeholder="username" value="admin">
-      <input id="loginPass" placeholder="password" type="password">
-      <button id="loginBtn">Open Dashboard</button>
-      <div class="muted" style="margin-left:auto">Hint: admin / nadeem</div>
-    </div>
-  </div>
+  <!-- dashboard -->
+  <div id="dash" style="display:none">
+    <div class="grid">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Realtime Leaderboard</strong>
+          <div class="muted">Live · updates automatically</div>
+        </div>
 
-  <!-- Main area (hidden until login) -->
-  <div id="mainGrid" class="mainGrid" style="display:none">
-    <div class="card">
-      <div style="display:flex;align-items:center;gap:12px">
-        <div style="font-weight:800">World Signal Map</div>
-        <div class="muted">Live joins (verified/unverified)</div>
-        <div style="margin-left:auto" class="muted"><span id="statTotal">0</span> total · <span id="statActive">0</span> active(24h)</div>
-      </div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+          <input id="search" placeholder="Search name or email">
+          <select id="refFilter"><option value="">Filter referrer</option></select>
+          <button id="exportBtn">Export CSV</button>
+          <button id="refreshBtn">Refresh</button>
+        </div>
 
-      <div id="globe" class="globeWrap" style="margin-top:8px"></div>
-      <div id="feed" class="feed"></div>
-    </div>
-
-    <div class="card" style="display:flex;flex-direction:column">
-      <div class="controls">
-        <select id="refSelect"><option value="">All Referrers</option></select>
-        <input id="search" placeholder="Search name or email">
-        <button id="refresh">Refresh</button>
-      </div>
-
-      <div style="flex:1;overflow:auto;margin-top:8px">
-        <table>
-          <thead><tr><th>Rank</th><th>Name</th><th>Email</th><th>Total</th><th>Active24</th><th>Offline</th><th>Fake</th><th>Active%</th><th>Score</th><th>Details</th></tr></thead>
-          <tbody id="leaderboardBody"><tr><td colspan="10" class="muted">Waiting for data…</td></tr></tbody>
+        <table style="margin-top:10px">
+          <thead><tr><th>Rank</th><th>Name</th><th>Email</th><th>Total</th><th>Active(24h)</th><th>Offline</th><th>Fake(same IP)</th><th>Active%</th><th>Score</th><th>Details</th></tr></thead>
+          <tbody id="leaderBody"><tr><td colspan="10" class="muted">Waiting for data…</td></tr></tbody>
         </table>
       </div>
-      <div style="margin-top:8px">
-        <canvas id="cpmChart" height="140"></canvas>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Live Feed</strong>
+          <div class="muted">Most recent joins</div>
+        </div>
+        <div class="feed" id="feed"></div>
+
+        <div style="margin-top:12px">
+          <strong>Totals</strong>
+          <div class="muted" style="margin-top:6px">Total invites: <span id="totalInv">0</span></div>
+          <div class="muted">Active(24h): <span id="totalActive">0</span></div>
+          <div class="muted">Unique IPs: <span id="uniqueIPs">0</span></div>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Settings dialog -->
-<dialog id="settingsDlg">
-  <div class="dlgHead"><strong>Settings - Firebase Config</strong><button id="closeSettings" style="margin-left:auto">Close</button></div>
-  <div class="dlgBody">
-    <textarea id="fbConfig" rows="8" style="width:100%;background:#021a1b;color:#bff;border-radius:6px;padding:8px"></textarea>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button id="saveConfig">Save</button>
-      <div class="muted">Saved config stored in localStorage for convenience.</div>
-    </div>
-  </div>
-</dialog>
-
-<!-- Details dialog -->
+<!-- details dialog (simple) -->
 <dialog id="detailsDlg">
-  <div class="dlgHead"><strong id="detailsTitle">Details</strong><button id="closeDetails" style="margin-left:auto">Close</button></div>
-  <div class="dlgBody">
-    <div id="detailsSummary" class="muted" style="margin-bottom:8px"></div>
-    <table style="width:100%"><thead><tr><th>Email</th><th>Verified</th><th>Country</th><th>IP</th><th>When</th><th>Active</th></tr></thead><tbody id="detailsBody"></tbody></table>
+  <div style="padding:12px;min-width:320px">
+    <h3 id="detailsTitle">Details</h3>
+    <div id="detailsSummary" class="muted"></div>
+    <table style="width:100%;margin-top:8px"><thead><tr><th>Email</th><th>Verified</th><th>Country</th><th>IP</th><th>When</th><th>Active</th></tr></thead>
+      <tbody id="detailsBody"></tbody>
+    </table>
+    <div style="margin-top:8px;text-align:right"><button id="closeDetails">Close</button></div>
   </div>
 </dialog>
 
 <script type="module">
-/* ========================= ADMIN.HTML (complete) =========================
- - Uses Firestore 'referrals' collection written by client tracker + Cloud Function
- - Login gate: username 'admin' + password 'nadeem' (simple local gate)
- - Realtime globe with points, animated rings, and arcs (inviter → invitee)
- - Leaderboard + details modal, CSV export, settings (edit Firebase config)
-=============================================================================*/
+/*
+  admin.html (classic)
+  - realtime listener on 'referrals' collection
+  - aggregates by referrer (lowercased)
+  - shows totals, active(24h), fake counts (same IP), per-referrer details
+  - simple login gate (admin/nadeem)
+*/
 
-/* ---- default Firebase config (yours) ---- */
-const defaultConfig = {
+// --- FIREBASE (your project's config) ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const firebaseConfig = {
   apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
   authDomain: "adwatchrewardsapp.firebaseapp.com",
   projectId: "adwatchrewardsapp",
@@ -138,166 +112,151 @@ const defaultConfig = {
   measurementId: "G-4NG2564HTK"
 };
 
-/* ---- DOM refs ---- */
-const loginBtn = document.getElementById('loginBtn'),
-      loginUser = document.getElementById('loginUser'),
-      loginPass = document.getElementById('loginPass'),
-      loginCard = document.getElementById('loginCard'),
-      mainGrid = document.getElementById('mainGrid'),
-      leaderboardBody = document.getElementById('leaderboardBody'),
-      feed = document.getElementById('feed'),
-      statTotal = document.getElementById('statTotal'),
-      statActive = document.getElementById('statActive'),
-      refSelect = document.getElementById('refSelect'),
-      searchEl = document.getElementById('search'),
-      refreshBtn = document.getElementById('refresh'),
-      exportCsvBtn = document.getElementById('exportCsv'),
-      settingsBtn = document.getElementById('settingsBtn'),
-      settingsDlg = document.getElementById('settingsDlg'),
-      fbConfigTA = document.getElementById('fbConfig'),
-      saveConfig = document.getElementById('saveConfig'),
-      closeSettings = document.getElementById('closeSettings'),
-      detailsDlg = document.getElementById('detailsDlg'),
-      detailsTitle = document.getElementById('detailsTitle'),
-      detailsBody = document.getElementById('detailsBody'),
-      detailsSummary = document.getElementById('detailsSummary'),
-      closeDetails = document.getElementById('closeDetails');
-
-closeSettings.onclick = ()=> settingsDlg.close();
-settingsBtn.onclick = ()=> settingsDlg.showModal();
-closeDetails.onclick = ()=> detailsDlg.close();
-
-/* ---- settings load/save ---- */
-const storedCfg = localStorage.getItem('affiliate_firebase_config') || JSON.stringify(defaultConfig, null, 2);
-fbConfigTA.value = storedCfg;
-saveConfig.onclick = ()=>{
-  try{
-    const obj = JSON.parse(fbConfigTA.value);
-    localStorage.setItem('affiliate_firebase_config', JSON.stringify(obj));
-    alert('Saved config to localStorage. Reloading to apply');
-    location.reload();
-  }catch(e){ alert('Invalid JSON'); }
-};
-
-/* ---- initialize firebase (from stored or default) ---- */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-
-const cfg = JSON.parse(localStorage.getItem('affiliate_firebase_config') || JSON.stringify(defaultConfig));
-const app = initializeApp(cfg);
+const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* ---- globe ---- */
-let gInstance;
-function buildGlobe(){
-  if(gInstance) return gInstance;
-  const el = document.getElementById('globe');
-  gInstance = Globe()(el)
-    .globeImageUrl("//unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
-    .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
-    .backgroundColor("rgba(0,0,0,0)")
-    .pointsData([])
-    .pointAltitude(0.03)
-    .pointRadius(0.4)
-    .pointColor(d => d.color || "#39ff14")
-    .ringsData([])
-    .ringColor(() => t => `rgba(0,255,122,${1-t})`)
-    .ringMaxRadius(4)
-    .ringPropagationSpeed(2.3)
-    .ringRepeatPeriod(1000)
-    .arcsData([])
-    .arcDashLength(0.4)
-    .arcDashGap(0.6)
-    .arcDashAnimateTime(3000)
-    .arcColor(a => a.color || '#12e3ff')
-    .arcStroke(0.9);
-  return gInstance;
-}
-function pulse(lat,lon,verified){
-  if(!gInstance || lat==null || lon==null) return;
-  const rings = gInstance.ringsData() || [];
-  rings.push({ lat, lng: lon, verified: !!verified });
-  if(rings.length>300) rings.shift();
-  gInstance.ringsData(rings);
-}
+// UI refs
+const loginBtn = document.getElementById('loginBtn'), userEl = document.getElementById('user'), passEl = document.getElementById('pass');
+const loginCard = document.getElementById('loginCard'), dash = document.getElementById('dash');
+const leaderBody = document.getElementById('leaderBody'), feed = document.getElementById('feed');
+const totalInvEl = document.getElementById('totalInv'), totalActiveEl = document.getElementById('totalActive'), uniqueIPsEl = document.getElementById('uniqueIPs');
+const exportBtn = document.getElementById('exportBtn'), refreshBtn = document.getElementById('refreshBtn');
+const refFilter = document.getElementById('refFilter'), searchEl = document.getElementById('search');
 
-/* ---- helpers ---- */
-function niceTime(ts){ const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : new Date()); return d.toLocaleString(); }
-function isActive24(ts){ const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : new Date()); return (Date.now() - d.getTime()) <= 24*60*60*1000; }
+// details dialog
+const detailsDlg = document.getElementById('detailsDlg'), detailsTitle = document.getElementById('detailsTitle'), detailsBody = document.getElementById('detailsBody'), detailsSummary = document.getElementById('detailsSummary');
+const closeDetails = document.getElementById('closeDetails'); closeDetails.onclick = ()=> detailsDlg.close();
+
+// login handler (simple local gate)
+loginBtn.onclick = () => {
+  if(userEl.value.trim() === 'admin' && passEl.value.trim() === 'nadeem'){
+    loginCard.style.display = 'none';
+    dash.style.display = 'block';
+    startRealtime();
+  } else {
+    alert('Wrong credentials');
+  }
+};
+
+// helpers
+function isActive24(ts){
+  if(!ts) return false;
+  const t = ts.toDate ? ts.toDate().getTime() : (new Date(ts)).getTime();
+  return (Date.now() - t) <= 24*60*60*1000;
+}
+function niceTime(ts){
+  if(!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString();
+}
 function regionScore(country){
-  const c=(country||"").toLowerCase();
-  if(["usa","united states","canada","uk"].some(x=>c.includes(x))) return 500;
-  if(["germany","france","italy","spain","netherlands"].some(x=>c.includes(x))) return 370;
-  if(["uae","saudi","qatar","kuwait"].some(x=>c.includes(x))) return 350;
+  if(!country) return 130;
+  const c = (country||'').toLowerCase();
+  if(['usa','united states','canada','uk','united kingdom'].some(x=>c.includes(x))) return 500;
+  if(['germany','france','italy','spain','netherlands'].some(x=>c.includes(x))) return 370;
+  if(['uae','saudi','qatar','kuwait'].some(x=>c.includes(x))) return 350;
   return 130;
 }
 
-/* ---- realtime & aggregation ---- */
-let rawDocs = [];
+// realtime listener
+let raw = [];
+function startRealtime(){
+  const q = query(collection(db, 'referrals'), );
+  onSnapshot(q, snap => {
+    raw = snap.docs.map(d => d.data());
+    renderAll();
+  }, err => {
+    console.error("onSnapshot error:", err);
+  });
+}
+
 function aggregate(){
   const by = {};
-  rawDocs.forEach(d=>{
-    const name = (d.referrer || "unknown").toLowerCase();
-    if(!by[name]) by[name] = { name, email: "N/A", visits: [] };
-    if(d.email && d.email !== "N/A" && by[name].email === "N/A") by[name].email = d.email;
-    by[name].visits.push(d);
+  raw.forEach(doc => {
+    const name = (doc.referrer || doc.referrerRaw || 'unknown').toString().toLowerCase();
+    if(!by[name]) by[name] = { name, email:'N/A', visits: [] };
+    if(doc.email && doc.email !== 'N/A' && by[name].email === 'N/A') by[name].email = doc.email;
+    by[name].visits.push(doc);
   });
 
   const rows = [];
-  Object.values(by).forEach(entry=>{
-    const ipCount = {}; let total=0, active=0, offline=0, fake=0, score=0; const countries={};
-    entry.visits.forEach(v=>{
-      total++; if(isActive24(v.ts)) active++; else offline++;
-      ipCount[v.ip || ""] = (ipCount[v.ip || ""]||0) + 1;
-      const c = v.country || "Unknown"; countries[c] = (countries[c]||0) + 1;
-      score += Number(v.score || (10 + regionScore(c)));
+  Object.values(by).forEach(e => {
+    let total=0, active=0, offline=0, fake=0, score=0;
+    const ipCount = {}, countries = {};
+    e.visits.forEach(v => {
+      total++;
+      if(isActive24(v.ts)) active++; else offline++;
+      ipCount[v.ip || ''] = (ipCount[v.ip || ''] || 0) + 1;
+      const c = v.country || 'Unknown'; countries[c] = (countries[c]||0)+1;
+      score += (v.score || (10 + regionScore(c)));
     });
-    Object.values(ipCount).forEach(n=>{ if(n>1) fake += (n-1); });
+    Object.values(ipCount).forEach(n => { if(n>1) fake += (n-1); });
     const activePct = total ? Math.round(active/total*100) : 0;
-    rows.push({ name: entry.name, email: entry.email, total, active, offline, fake, activePct, score, visits: entry.visits, countries });
+    rows.push({ name: e.name, email: e.email, total, active, offline, fake, activePct, score, visits: e.visits, countries });
   });
 
-  rows.sort((a,b)=> b.score - a.score);
+  rows.sort((a,b) => b.score - a.score);
   return rows;
 }
 
-function render(){
+function renderAll(){
+  // header totals
+  totalInvEl.textContent = raw.length;
+  totalActiveEl.textContent = raw.filter(r => isActive24(r.ts)).length;
+  uniqueIPsEl.textContent = [...new Set(raw.map(r => r.ip || ''))].length;
+
+  // refill feed (most recent 30)
+  const recent = raw.slice(-40).reverse();
+  feed.innerHTML = '';
+  recent.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'feedRow';
+    div.innerHTML = `<div style="flex:1">${(r.email && r.email!=='N/A')? r.email : '<span class="muted">Unknown</span>'}</div>
+                     <div style="width:110px;text-align:right">${r.country || '<span class="muted">N/A</span>'}</div>
+                     <div style="width:120px;text-align:right">${r.ip || 'N/A'}</div>
+                     <div style="width:100px;text-align:right">${(r.referrer||'unknown').toUpperCase()}</div>`;
+    feed.appendChild(div);
+  });
+
+  // leaderboard
   const rows = aggregate();
-  // header stats
-  statTotal.textContent = rawDocs.length;
-  statActive.textContent = rawDocs.filter(d => isActive24(d.ts)).length;
 
-  // ref select
-  refSelect.innerHTML = "<option value=''>All Referrers</option>" + rows.map(r=>`<option value="${r.name}">${r.name.toUpperCase()}</option>`).join("");
+  // populate filter select
+  refFilter.innerHTML = `<option value="">Filter referrer</option>` + rows.map(r => `<option value="${r.name}">${r.name.toUpperCase()}</option>`).join('');
 
-  // filter
-  const q = (searchEl.value || "").toLowerCase();
-  const list = rows.filter(r => r.name.includes(q) || (r.email||"").toLowerCase().includes(q));
-  if(list.length===0) leaderboardBody.innerHTML = `<tr><td colspan="10" class="muted">No data</td></tr>`;
-  else leaderboardBody.innerHTML = list.map((r,i)=>`
-    <tr>
-      <td>${i+1}${i===0? ' <span class="badge">TOP</span>':''}</td>
-      <td>${r.name.toUpperCase()}</td>
-      <td>${r.email}</td>
-      <td>${r.total}</td>
-      <td>${r.active}</td>
-      <td>${r.offline}</td>
-      <td>${r.fake}</td>
-      <td><span class="pill">${r.activePct}%</span></td>
-      <td>${r.score}</td>
-      <td><button class="detBtn" data-name="${r.name}">Details</button></td>
-    </tr>
-  `).join("");
+  // apply search / filter
+  const q = (searchEl.value || '').toLowerCase();
+  const filter = refFilter.value || '';
+  const filtered = rows.filter(r => (r.name.includes(q) || (r.email||'').toLowerCase().includes(q)) && (filter ? r.name === filter : true));
 
-  // detail handlers
-  document.querySelectorAll('.detBtn').forEach(btn=>{
-    btn.onclick = ()=>{
+  if(filtered.length === 0){
+    leaderBody.innerHTML = `<tr><td colspan="10" class="muted">No data</td></tr>`;
+  } else {
+    leaderBody.innerHTML = filtered.map((r,i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>${r.name.toUpperCase()}</td>
+        <td>${r.email}</td>
+        <td>${r.total}</td>
+        <td>${r.active}</td>
+        <td>${r.offline}</td>
+        <td>${r.fake}</td>
+        <td>${r.activePct}%</td>
+        <td>${r.score}</td>
+        <td><button class="detailBtn" data-name="${r.name}">Details</button></td>
+      </tr>
+    `).join('');
+  }
+
+  // attach detail buttons
+  document.querySelectorAll('.detailBtn').forEach(btn => {
+    btn.onclick = () => {
       const name = btn.dataset.name;
-      const r = rows.find(x=>x.name===name);
-      if(!r) return;
+      const row = rows.find(x => x.name === name);
+      if(!row) return;
       detailsTitle.textContent = `Details — ${name.toUpperCase()}`;
-      detailsSummary.textContent = Object.entries(r.countries || {}).map(([c,n])=>`${c}: ${n}`).join(' · ');
-      detailsBody.innerHTML = r.visits.map(v=>`<tr>
+      detailsSummary.textContent = Object.entries(row.countries || {}).map(([c,n]) => `${c}: ${n}`).join(' · ');
+      detailsBody.innerHTML = row.visits.map(v => `<tr>
         <td>${v.email || 'N/A'}</td>
         <td>${v.verified ? 'Yes' : 'No'}</td>
         <td>${v.country || 'Unknown'}</td>
@@ -306,168 +265,29 @@ function render(){
         <td>${isActive24(v.ts) ? 'Yes' : 'No'}</td>
       </tr>`).join('');
       detailsDlg.showModal();
-
-      // focus globe to this referrer & build arcs
-      const pts = r.visits.filter(v=>v.lat!=null && v.lon!=null).map(v=>({lat:v.lat,lng:v.lon,size:0.9,color:v.verified?"#39ff14":"#12e3ff"}));
-      gInstance.pointsData(pts);
-
-      // build arcs from "inviter location" -> each visit (if inviter loc exists)
-      const refLoc = rawDocs.find(d => (d.referrer||'').toLowerCase() === name && d.lat!=null && d.lon!=null);
-      const arcs = [];
-      if(refLoc){
-        r.visits.forEach(v=>{
-          if(v.lat!=null && v.lon!=null && !(v.lat===refLoc.lat && v.lon===refLoc.lon)){
-            arcs.push({
-              startLat: refLoc.lat, startLng: refLoc.lon,
-              endLat: v.lat, endLng: v.lon,
-              color: v.verified ? '#39ff14' : '#12e3ff'
-            });
-          }
-        });
-      }
-      gInstance.arcsData(arcs);
-      updateCPMChart(r);
     };
   });
-
-  // global CPM chart update: sum buckets by country classification
-  const totals = rows.reduce((acc, r)=>{
-    Object.entries(r.countries || {}).forEach(([c,n])=>{
-      const rs = regionScore(c);
-      if(rs===500) acc.premium += n*(10+rs);
-      else if(rs===370) acc.europe += n*(10+rs);
-      else if(rs===350) acc.me += n*(10+rs);
-      else acc.asia += n*(10+rs);
-    });
-    return acc;
-  }, {premium:0,europe:0,me:0,asia:0});
-  updateCPMChart(totals);
 }
 
-/* ---- chart ---- */
-let barChart;
-function updateCPMChart(buckets){
-  const ctx = document.getElementById('cpmChart').getContext('2d');
-  const labels = ["Premium (US/CA/UK)","Europe","Middle East","Asia/Other"];
-  const data = [buckets.premium||0, buckets.europe||0, buckets.me||0, buckets.asia||0];
-  if(barChart){ barChart.data.datasets[0].data = data; barChart.update(); return; }
-  barChart = new Chart(ctx, {
-    type:'bar',
-    data:{ labels, datasets:[{ label:'CPM Score', data, backgroundColor:['#00ff7a','#12e3ff','#ffd166','#7af0b8'] }]},
-    options:{ plugins:{ legend:{display:false} }, scales:{ x:{ ticks:{color:'#bff'} }, y:{ ticks:{color:'#bff'} } } }
-  });
-}
-
-/* ---- realtime snapshot ---- */
-import { collection as coll } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-import { onSnapshot as onSnap } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
-const referralsCol = coll(db, "referrals");
-
-function startRealtime(){
-  gInstance = buildGlobe();
-
-  onSnap(referralsCol, snap=>{
-    rawDocs = snap.docs.map(d=>{
-      const data = d.data();
-      return {
-        ...data,
-        referrer: (data.referrer || data.referrerRaw || "unknown").toString().toLowerCase(),
-        email: data.email || "N/A",
-        verified: !!data.verified,
-        ip: data.ip || "",
-        country: data.country || "",
-        lat: data.lat || null,
-        lon: data.lon || null,
-        score: Number(data.score || 0),
-        ts: data.ts || data.server_ts || null
-      };
-    });
-
-    // build globe points
-    const pts = rawDocs.filter(r => r.lat!=null && r.lon!=null).slice(-1200).map(v=>({lat:v.lat,lng:v.lon,size:0.6,color:v.verified?"#39ff14":"#12e3ff"}));
-    gInstance.pointsData(pts);
-
-    // build arcs: map latest location per referrer and create arcs inviter->invitee
-    const refLoc = {};
-    rawDocs.forEach(d => {
-      if(d.lat!=null && d.lon!=null){
-        const name = (d.referrer || "unknown").toLowerCase();
-        if(!refLoc[name]) refLoc[name] = { lat: d.lat, lon: d.lon };
-      }
-    });
-    const arcs = [];
-    rawDocs.forEach(d=>{
-      const inviter = (d.referrer || "unknown").toLowerCase();
-      if(refLoc[inviter] && d.lat!=null && d.lon!=null){
-        arcs.push({
-          startLat: refLoc[inviter].lat, startLng: refLoc[inviter].lon,
-          endLat: d.lat, endLng: d.lon,
-          color: d.verified ? '#39ff14' : '#12e3ff'
-        });
-      }
-    });
-    gInstance.arcsData(arcs);
-
-    // show pulses for very recent joins and push feed
-    rawDocs.forEach(v=>{
-      const t = v.ts?.toDate ? v.ts.toDate().getTime() : (v.ts ? new Date(v.ts).getTime() : 0);
-      if(Date.now() - t < 8000 && v.lat!=null && v.lon!=null){
-        pulse(v.lat, v.lon, v.verified);
-        pushFeed(v);
-      }
-    });
-
-    render();
-  });
-}
-
-/* ---- feed ---- */
-function pushFeed(v){
-  const el = document.createElement('div');
-  el.className = 'feedRow';
-  el.innerHTML = `<div>${(v.email && v.email!=="N/A") ? v.email : '<span class="muted">Unknown</span>'}</div>
-                  <div>${v.country || '<span class="muted">Unknown</span>'}</div>
-                  <div>${v.ip || 'N/A'}</div>
-                  <div>${(v.referrer||'unknown').toUpperCase()}</div>`;
-  feed.prepend(el);
-  while(feed.children.length>140) feed.removeChild(feed.lastChild);
-}
-
-/* ---- CSV export ---- */
-exportCsvBtn.onclick = ()=>{
+// CSV export
+exportBtn.onclick = () => {
   const rows = aggregate();
-  let csv = 'Rank,Name,Email,Total,Active24,Offline,Fake,Active%,Score\n';
-  rows.forEach((r,i)=> csv += [i+1,r.name,r.email,r.total,r.active,r.offline,r.fake,r.activePct + '%', r.score].join(',') + '\n');
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download = 'leaderboard.csv'; a.click();
+  let csv = 'Rank,Name,Email,Total,Active24,Offline,Fake,ActivePercent,Score\n';
+  rows.forEach((r,i) => {
+    csv += [i+1, r.name, r.email, r.total, r.active, r.offline, r.fake, r.activePct + '%', r.score].join(',') + '\n';
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'leaderboard.csv';
+  a.click();
 };
 
-/* ---- interactions ---- */
-loginBtn.onclick = ()=>{
-  if(loginUser.value.trim() === 'admin' && loginPass.value.trim() === 'nadeem'){
-    loginCard.style.display = 'none';
-    mainGrid.style.display = 'grid';
-    startRealtime();
-  } else {
-    alert('Wrong credentials');
-  }
-};
-closeDetails.onclick = ()=> detailsDlg.close();
-refreshBtn.onclick = ()=> render();
-searchEl.addEventListener('input', render);
-refSelect.addEventListener('change', e=>{
-  const pick = (e.target.value||"").toLowerCase();
-  if(!pick){
-    const pts = rawDocs.filter(v=>v.lat!=null && v.lon!=null).slice(-800).map(v=>({lat:v.lat,lng:v.lon,size:0.6,color:v.verified?"#39ff14":"#12e3ff"}));
-    gInstance.pointsData(pts);
-    gInstance.arcsData([]);
-  } else {
-    const pts = rawDocs.filter(v => (v.referrer||"").toLowerCase()===pick && v.lat!=null && v.lon!=null).map(v=>({lat:v.lat,lng:v.lon,size:0.9,color:v.verified?"#39ff14":"#12e3ff"}));
-    gInstance.pointsData(pts);
-  }
-});
+// interactions
+searchEl.addEventListener('input', renderAll);
+refFilter.addEventListener('change', renderAll);
+refreshBtn.addEventListener('click', renderAll);
 
-/* ---- start globe quickly (so page loads visually) ---- */
-gInstance = buildGlobe();
+// startRealtime called on login success above
 
 </script>
 </body>
