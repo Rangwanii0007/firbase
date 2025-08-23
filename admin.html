@@ -1,369 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
-    <!-- Inter font from Google Fonts -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap">
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Custom CSS for the hacker-style dashboard theme and animations */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0d1117; /* Dark charcoal */
-            color: #c9d1d9; /* Light grey for text */
-        }
-        
-        .neon-text {
-            color: #0aff9a; /* Neon green */
-            text-shadow: 0 0 5px #0aff9a, 0 0 10px #0aff9a, 0 0 20px #0aff9a;
-        }
-
-        .section-background {
-            background-color: #161b22;
-        }
-
-        /* Pulse animation for the invite globe */
-        @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        .pulse-animation {
-            animation: pulse 2s infinite ease-in-out;
-        }
-        
-        /* Three.js canvas styling */
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-        
-        /* Scrollbar styling for better UX on dark theme */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: #161b22;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background-color: #2f363d;
-            border-radius: 4px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f8f9fa; margin:0; padding:20px; }
+    h1 { text-align:center; }
+    table { width:100%; border-collapse: collapse; margin-top:20px; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    th, td { padding:12px; border:1px solid #ddd; text-align:center; }
+    th { background:#007bff; color:white; }
+  </style>
 </head>
-<body class="antialiased">
-    <div class="min-h-screen flex flex-col p-4">
-        <!-- Header -->
-        <header class="w-full max-w-7xl mx-auto flex justify-between items-center py-4 mb-8 border-b border-gray-700">
-            <h1 class="text-3xl font-bold neon-text">Admin Dashboard</h1>
-            <div class="flex items-center space-x-4">
-                <span id="user-display" class="font-mono text-sm hidden"></span>
-                <button id="logout-btn" class="p-2 px-4 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors duration-200">
-                    Log Out
-                </button>
-            </div>
-        </header>
+<body>
+  <h1>Affiliate Dashboard</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Affiliate Name</th>
+        <th>Invited Users</th>
+        <th>Active Users</th>
+        <th>Offline Users</th>
+        <th>Fake Users</th>
+      </tr>
+    </thead>
+    <tbody id="userTable"></tbody>
+  </table>
 
-        <!-- Main Content Grid -->
-        <main class="w-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Left Column: Stats & Data Feed -->
-            <div class="md:col-span-1 space-y-8">
-                <!-- Live Stats -->
-                <div class="section-background p-6 rounded-xl shadow-inner border border-gray-700">
-                    <h2 class="text-2xl font-bold mb-4">Live Stats</h2>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="p-4 rounded-lg bg-[#0d1117] border border-gray-700">
-                            <p class="text-sm text-gray-400">Total Users</p>
-                            <p id="total-users" class="text-3xl font-bold neon-text">0</p>
-                        </div>
-                        <div class="p-4 rounded-lg bg-[#0d1117] border border-gray-700">
-                            <p class="text-sm text-gray-400">Total Referrals</p>
-                            <p id="total-referrals" class="text-3xl font-bold neon-text">0</p>
-                        </div>
-                    </div>
-                </div>
+  <script>
+    // ✅ Firebase Config (same as user side)
+    const firebaseConfig = {
+      apiKey: "AIzaSyEXAMPLE-12345",
+      authDomain: "your-project.firebaseapp.com",
+      databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+      projectId: "your-project",
+      storageBucket: "your-project.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef12345"
+    };
 
-                <!-- Live Activity Feed -->
-                <div class="section-background p-6 rounded-xl shadow-inner border border-gray-700">
-                    <h2 class="text-2xl font-bold mb-4">Live Activity Feed</h2>
-                    <div id="activity-feed" class="space-y-4 overflow-y-auto max-h-96">
-                        <!-- Activity items will be injected here -->
-                    </div>
-                </div>
-            </div>
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-            <!-- Right Column: Interactive Globe -->
-            <div class="md:col-span-2 section-background p-6 rounded-xl shadow-inner border border-gray-700">
-                <h2 class="text-2xl font-bold mb-4">Real-Time Visualization</h2>
-                <div id="globe-container" class="w-full aspect-video bg-[#0d1117] rounded-lg">
-                    <!-- Three.js canvas will be injected here -->
-                    <div id="globe-loading" class="absolute inset-0 flex items-center justify-center bg-[#0d1117] rounded-lg text-[#0aff9a]">
-                        <svg class="spinner h-10 w-10 text-white" viewBox="0 0 50 50">
-                            <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="4"></circle>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
+    const tableBody = document.getElementById("userTable");
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // --- Firebase Configuration ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-        // --- DOM Elements ---
-        const totalUsersEl = document.getElementById('total-users');
-        const totalReferralsEl = document.getElementById('total-referrals');
-        const activityFeedEl = document.getElementById('activity-feed');
-        const logoutBtn = document.getElementById('logout-btn');
-        const userDisplay = document.getElementById('user-display');
-
-        // Sign in anonymously with the custom token provided by the environment
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : '';
-        if (initialAuthToken) {
-            signInWithCustomToken(auth, initialAuthToken).catch(error => {
-                console.error("Custom token sign-in failed:", error);
-                signInAnonymously(auth);
-            });
-        } else {
-            signInAnonymously(auth);
-        }
-
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                userDisplay.textContent = `User ID: ${user.uid.substring(0, 8)}...`;
-                userDisplay.classList.remove('hidden');
-                
-                // Real-time listener for users collection
-                const usersRef = collection(db, `/artifacts/${appId}/public/data/users`);
-                onSnapshot(usersRef, (snapshot) => {
-                    const users = [];
-                    snapshot.forEach(doc => {
-                        users.push({ id: doc.id, ...doc.data() });
-                    });
-                    totalUsersEl.textContent = users.length;
-                    
-                    // Update globe with user data
-                    const globeData = users.reduce((acc, user) => {
-                        // For demonstration, we'll use a pseudo-random location
-                        // In a real app, you would use a geolocation service to get lat/lon from IP
-                        const lat = (user.ip || '0.0.0.0').split('.').reduce((a, b) => a + parseInt(b), 0) % 180 - 90;
-                        const lon = (user.ip || '0.0.0.0').split('.').reduce((a, b) => a + parseInt(b), 0) * 2 % 360 - 180;
-                        acc[user.referralCode] = { lat, lon, ...user };
-                        return acc;
-                    }, {});
-                    updateGlobeVisuals(globeData, {}); // Pass user data to the globe
-                });
-
-                // Real-time listener for referrals collection
-                const referralsRef = collection(db, `/artifacts/${appId}/public/data/referrals`);
-                onSnapshot(referralsRef, (snapshot) => {
-                    const referrals = [];
-                    snapshot.forEach(doc => {
-                        referrals.push({ id: doc.id, ...doc.data() });
-                        const data = doc.data();
-                        const inviterId = data.inviter.substring(0, 8);
-                        const inviteeId = data.invitee.substring(0, 8);
-                        const timestamp = new Date(data.timestamp.toDate()).toLocaleTimeString();
-                        const feedItem = document.createElement('div');
-                        feedItem.className = 'bg-[#0d1117] p-3 rounded-lg border border-gray-700';
-                        feedItem.innerHTML = `<p class="text-sm font-mono">New Referral!</p><p class="text-xs text-gray-400">${inviterId} invited ${inviteeId}</p><p class="text-xs text-right text-gray-500">${timestamp}</p>`;
-                        activityFeedEl.prepend(feedItem);
-                    });
-                    totalReferralsEl.textContent = referrals.length;
-                    
-                    // Update globe with referral data
-                    const globeData = referrals.reduce((acc, referral) => {
-                        acc[referral.id] = referral;
-                        return acc;
-                    }, {});
-                    updateGlobeVisuals({}, globeData); // Pass referral data to the globe
-                });
-            } else {
-                // If not logged in, redirect to index.html or show a login form
-                // For this example, we'll just show an error message
-                alert("You are not logged in. Please log in to view the dashboard.");
-                window.location.href = 'index.html';
-            }
-        });
-
-        logoutBtn.addEventListener('click', () => {
-            signOut(auth);
-        });
-
-        // Placeholder for a simple modal/alert system instead of alert()
-        function alert(message) {
-            const modal = document.createElement('div');
-            modal.innerHTML = `
-                <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-xl border border-gray-700 max-w-sm">
-                        <p class="text-white text-center mb-4">${message}</p>
-                        <button class="w-full p-2 rounded-lg bg-[#0aff9a] text-black font-bold" onclick="this.parentNode.parentNode.remove()">OK</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
-    </script>
-    <!-- Three.js Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script type="text/javascript">
-        // --- Three.js Globe Visualization Logic ---
-        let scene, camera, renderer, globe;
-        const globeContainer = document.getElementById('globe-container');
-        const globeLoading = document.getElementById('globe-loading');
-        let usersData = {};
-        let referralsData = {};
-        let points = [];
-        let connections = [];
-
-        function initGlobe() {
-            // Scene, Camera, Renderer Setup
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, globeContainer.clientWidth / globeContainer.clientHeight, 0.1, 1000);
-            camera.position.z = 200;
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(globeContainer.clientWidth, globeContainer.clientHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            globeContainer.appendChild(renderer.domElement);
-            
-            // Sphere (Globe)
-            const globeGeometry = new THREE.SphereGeometry(100, 64, 64);
-            const globeMaterial = new THREE.MeshBasicMaterial({ color: 0x161b22, wireframe: true });
-            globe = new THREE.Mesh(globeGeometry, globeMaterial);
-            scene.add(globe);
-            
-            // Add a simple grid to the globe for a techy feel
-            const gridGeometry = new THREE.PlaneGeometry(200, 200, 20, 20);
-            const gridMaterial = new THREE.MeshBasicMaterial({ color: 0x0aff9a, wireframe: true, transparent: true, opacity: 0.1 });
-            const grid = new THREE.Mesh(gridGeometry, gridMaterial);
-            grid.rotation.x = Math.PI / 2;
-            grid.rotation.z = Math.PI / 2;
-            grid.position.y = -100;
-            scene.add(grid);
-
-            // Hide loading indicator
-            globeLoading.classList.add('hidden');
-
-            // Animation Loop
-            animateGlobe();
-        }
-
-        function animateGlobe() {
-            requestAnimationFrame(animateGlobe);
-            globe.rotation.y += 0.001;
-            renderer.render(scene, camera);
-        }
-        
-        // This function will be called from the Firebase listener in the main script
-        function updateGlobeVisuals(newUsers = {}, newReferrals = {}) {
-            usersData = { ...usersData, ...newUsers };
-            referralsData = { ...referralsData, ...newReferrals };
-            
-            // Clear existing points and connections
-            points.forEach(p => scene.remove(p));
-            connections.forEach(c => scene.remove(c));
-            points = [];
-            connections = [];
-            
-            // Create Points for each user
-            for (const userId in usersData) {
-                const user = usersData[userId];
-                // Use a pseudo-random location based on user ID for visualization
-                const lat = (user.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0) % 180) - 90;
-                const lon = (user.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0) * 2 % 360) - 180;
-                
-                const pointGeometry = new THREE.SphereGeometry(1, 16, 16);
-                const pointMaterial = new THREE.MeshBasicMaterial({ color: 0x0aff9a });
-                const point = new THREE.Mesh(pointGeometry, pointMaterial);
-                
-                const phi = (90 - lat) * (Math.PI / 180);
-                const theta = (lon + 180) * (Math.PI / 180);
-                const radius = 100;
-                
-                point.position.x = -(radius * Math.sin(phi) * Math.cos(theta));
-                point.position.z = (radius * Math.sin(phi) * Math.sin(theta));
-                point.position.y = (radius * Math.cos(phi));
-                
-                points.push(point);
-                scene.add(point);
-            }
-            
-            // Create Lines for each referral connection
-            for (const refId in referralsData) {
-                const referral = referralsData[refId];
-                const inviter = usersData[referral.inviter];
-                const invitee = usersData[referral.invitee];
-                
-                if (inviter && invitee) {
-                    const inviterLat = (inviter.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0) % 180) - 90;
-                    const inviterLon = (inviter.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0) * 2 % 360) - 180;
-                    const inviteeLat = (invitee.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0) % 180) - 90;
-                    const inviteeLon = (invitee.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0) * 2 % 360) - 180;
-                    
-                    const startPhi = (90 - inviterLat) * (Math.PI / 180);
-                    const startTheta = (inviterLon + 180) * (Math.PI / 180);
-                    const endPhi = (90 - inviteeLat) * (Math.PI / 180);
-                    const endTheta = (inviteeLon + 180) * (Math.PI / 180);
-                    
-                    const startVec = new THREE.Vector3(
-                        -(100 * Math.sin(startPhi) * Math.cos(startTheta)),
-                        (100 * Math.cos(startPhi)),
-                        (100 * Math.sin(startPhi) * Math.sin(startTheta))
-                    );
-                    
-                    const endVec = new THREE.Vector3(
-                        -(100 * Math.sin(endPhi) * Math.cos(endTheta)),
-                        (100 * Math.cos(endPhi)),
-                        (100 * Math.sin(endPhi) * Math.sin(endTheta))
-                    );
-                    
-                    const curve = new THREE.QuadraticBezierCurve3(
-                        startVec,
-                        new THREE.Vector3(0, 0, 0),
-                        endVec
-                    );
-                    
-                    const lineGeometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(50));
-                    const lineMaterial = new THREE.LineBasicMaterial({
-                        color: 0x0aff9a,
-                        transparent: true,
-                        opacity: 0.5
-                    });
-                    
-                    const line = new THREE.Line(lineGeometry, lineMaterial);
-                    connections.push(line);
-                    scene.add(line);
-                }
-            }
-        }
-        
-        window.addEventListener('resize', () => {
-            camera.aspect = globeContainer.clientWidth / globeContainer.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(globeContainer.clientWidth, globeContainer.clientHeight);
-        });
-
-        window.onload = function() {
-            initGlobe();
-        };
-    </script>
+    // ✅ Real-time listener
+    db.ref("users").on("value", snapshot => {
+      tableBody.innerHTML = "";
+      snapshot.forEach(child => {
+        const data = child.val();
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${data.affiliateName || "N/A"}</td>
+          <td>${data.invited || 0}</td>
+          <td>${data.active ? 1 : 0}</td>
+          <td>${data.active ? 0 : 1}</td>
+          <td>${data.fake ? 1 : 0}</td>
+        `;
+        tableBody.appendChild(tr);
+      });
+    });
+  </script>
 </body>
 </html>
