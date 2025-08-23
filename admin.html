@@ -1,66 +1,211 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Admin Dashboard</title>
-  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; background:#f8f9fa; margin:0; padding:20px; }
-    h1 { text-align:center; }
-    table { width:100%; border-collapse: collapse; margin-top:20px; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
-    th, td { padding:12px; border:1px solid #ddd; text-align:center; }
-    th { background:#007bff; color:white; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Referral Admin Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #5a2c7a;
+            text-align: center;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .card {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .card h3 {
+            margin: 0 0 10px;
+            font-size: 1.2em;
+        }
+        .card .value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #4a90e2;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #5a2c7a;
+            color: white;
+            text-transform: uppercase;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+    </style>
 </head>
 <body>
-  <h1>Affiliate Dashboard</h1>
-  <table>
-    <thead>
-      <tr>
-        <th>Affiliate Name</th>
-        <th>Invited Users</th>
-        <th>Active Users</th>
-        <th>Offline Users</th>
-        <th>Fake Users</th>
-      </tr>
-    </thead>
-    <tbody id="userTable"></tbody>
-  </table>
 
-  <script>
-    // ✅ Firebase Config (same as user side)
-    const firebaseConfig = {
-      apiKey: "AIzaSyEXAMPLE-12345",
-      authDomain: "your-project.firebaseapp.com",
-      databaseURL: "https://your-project-default-rtdb.firebaseio.com",
-      projectId: "your-project",
-      storageBucket: "your-project.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "1:123456789:web:abcdef12345"
-    };
+    <div class="container">
+        <h1>Referral Dashboard</h1>
+        
+        <div class="summary-grid" id="summary-grid">
+            </div>
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+        <div class="table-container">
+            <table id="referral-table">
+                <thead>
+                    <tr>
+                        <th>NAME</th>
+                        <th>Invited</th>
+                        <th>ACTIVE</th>
+                        <th>INACTIVE</th>
+                        <th>FAKE USERS</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="referral-table-body">
+                    </tbody>
+            </table>
+        </div>
+    </div>
 
-    const tableBody = document.getElementById("userTable");
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-    // ✅ Real-time listener
-    db.ref("users").on("value", snapshot => {
-      tableBody.innerHTML = "";
-      snapshot.forEach(child => {
-        const data = child.val();
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${data.affiliateName || "N/A"}</td>
-          <td>${data.invited || 0}</td>
-          <td>${data.active ? 1 : 0}</td>
-          <td>${data.active ? 0 : 1}</td>
-          <td>${data.fake ? 1 : 0}</td>
-        `;
-        tableBody.appendChild(tr);
-      });
-    });
-  </script>
+    <script>
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyEXAMPLE-12345",
+            authDomain: "your-project.firebaseapp.com",
+            databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef12345"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Get the table body and summary grid elements
+        const tableBody = document.getElementById('referral-table-body');
+        const summaryGrid = document.getElementById('summary-grid');
+
+        // Function to create a summary card
+        function createSummaryCard(name, invited, active, inactive, fake) {
+            return `
+                <div class="card">
+                    <h3>${name}</h3>
+                    <p>Invited: <span class="value">${invited}</span></p>
+                    <p>Active: <span class="value">${active}</span></p>
+                    <p>Inactive: <span class="value">${inactive}</span></p>
+                    <p>Fake: <span class="value">${fake}</span></p>
+                </div>
+            `;
+        }
+
+        // Listen for real-time changes in the 'invited_users' data
+        database.ref('invited_users').on('value', (snapshot) => {
+            const users = snapshot.val();
+            const referralData = {};
+            const friends = ['NADEEEM', 'IKRAM', 'ShAHID', 'HAFEEZ'];
+
+            // Initialize data for each friend
+            friends.forEach(friend => {
+                referralData[friend.toUpperCase()] = {
+                    invited: 0,
+                    active: 0,
+                    inactive: 0,
+                    fake: 0,
+                    details: {}
+                };
+            });
+
+            if (users) {
+                // Process the data to get the counts for each friend
+                Object.values(users).forEach(user => {
+                    const invitedBy = user.invited_by;
+                    if (referralData[invitedBy]) {
+                        referralData[invitedBy].invited++;
+                        if (user.status === 'ACTIVE') {
+                            referralData[invitedBy].active++;
+                        } else {
+                            referralData[invitedBy].inactive++;
+                        }
+                        if (user.isFake) {
+                            referralData[invitedBy].fake++;
+                        }
+                        
+                        // Populate country details
+                        const country = user.country || 'Unknown';
+                        if (!referralData[invitedBy].details[country]) {
+                            referralData[invitedBy].details[country] = 0;
+                        }
+                        referralData[invitedBy].details[country]++;
+                    }
+                });
+            }
+
+            // Clear the tables and re-populate
+            tableBody.innerHTML = '';
+            summaryGrid.innerHTML = '';
+            
+            friends.forEach(friend => {
+                const data = referralData[friend.toUpperCase()];
+                
+                // Add to summary cards
+                summaryGrid.innerHTML += createSummaryCard(
+                    friend,
+                    data.invited,
+                    data.active,
+                    data.inactive,
+                    data.fake
+                );
+
+                // Add to main table
+                const row = document.createElement('tr');
+                let detailsText = '';
+                for (const [country, count] of Object.entries(data.details)) {
+                    detailsText += `${country}: ${count}<br>`;
+                }
+                row.innerHTML = `
+                    <td>${friend.toUpperCase()}</td>
+                    <td>${data.invited}</td>
+                    <td>${data.active}</td>
+                    <td>${data.inactive}</td>
+                    <td>${data.fake}</td>
+                    <td>${detailsText}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        });
+    </script>
 </body>
 </html>
