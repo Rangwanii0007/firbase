@@ -3,343 +3,232 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Admin Dashboard</title>
+    <title>Admin Dashboard</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter font for clean typography -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
         body {
-            font-family: 'Poppins', sans-serif;
-            background: #1a1a2e;
-            color: #e0e0e0;
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1f2937 0%, #0c1527 100%);
+            min-height: 100vh;
+            color: #e5e7eb;
+            transition: all 0.3s ease;
         }
-        .dashboard-header {
-            text-align: center;
-            padding: 40px 20px;
-            background: linear-gradient(135deg, #162447, #1f4068);
-            border-bottom: 2px solid #283747;
+        .bg-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
         }
-        .dashboard-header h1 {
-            font-size: 2.5rem;
-            color: #ff6b6b;
-            margin: 0;
-            font-weight: 700;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 20px auto;
-            padding: 20px;
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 40px;
-        }
-        .main-content {
-            background: #1f2537;
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        }
-        .sidebar {
-            background: #1f2537;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            text-align: center;
-        }
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .card {
-            background: #283747;
-            padding: 25px;
-            border-radius: 10px;
-            text-align: center;
-            border-left: 5px solid #ff6b6b;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
-        }
-        .card h3 {
-            margin: 0 0 10px;
-            font-size: 1.2rem;
-            color: #fff;
+        .table-header {
+            background: #1f2937;
+            color: white;
             font-weight: 600;
         }
-        .card .value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #ffd166;
+        .table-row:nth-child(even) {
+            background-color: rgba(255, 255, 255, 0.05);
         }
-        .table-container {
-            overflow-x: auto;
+        .table-row:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: scale(1.01);
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-            background: #1a1a2e;
-            border-radius: 8px;
-        }
-        th, td {
-            padding: 15px 20px;
-            text-align: left;
-            border-bottom: 1px solid #283747;
-        }
-        th {
-            background-color: #1f4068;
-            color: #ff6b6b;
-            text-transform: uppercase;
+        .btn-details {
+            background: linear-gradient(45deg, #4f46e5, #8b5cf6);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
             font-weight: 600;
-            font-size: 0.9rem;
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-        tr:nth-child(even) {
-            background-color: #162447;
+        .btn-details:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px -1px rgba(0, 0, 0, 0.2), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-        tr:hover {
-            background-color: #283747;
-        }
-        td span {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 50px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-        td .invited { background: #3498db; }
-        td .active { background: #2ecc71; }
-        td .inactive { background: #e74c3c; }
-        td .fake { background: #f39c12; }
-        
-        #globeCanvas {
-            width: 100%;
-            height: 400px;
-            background: #1a1a2e;
-            border-radius: 10px;
-            margin-bottom: 20px;
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.75);
         }
     </style>
 </head>
-<body>
+<body class="p-8">
 
-    <header class="dashboard-header">
-        <h1>Advanced Referral Dashboard</h1>
-    </header>
+    <!-- Main Dashboard Container -->
+    <div class="max-w-7xl mx-auto py-8">
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 text-center mb-6">
+            Real-Time Referral Dashboard
+        </h1>
+        <p class="text-center text-gray-400 mb-10 text-lg">
+            Track your referrers and new users in real-time. This data updates live.
+        </p>
 
-    <div class="container">
-        <div class="main-content">
-            <h2>Referral Summary</h2>
-            <div class="summary-grid" id="summary-grid">
-                </div>
-            
-            <h2>Detailed Referrals</h2>
-            <div class="table-container">
-                <table id="referral-table">
-                    <thead>
+        <!-- Main Data Table -->
+        <div class="bg-card overflow-hidden shadow-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-300 mb-4">Referrer Statistics</h2>
+            <div class="overflow-x-auto rounded-xl">
+                <table class="min-w-full divide-y divide-gray-700">
+                    <thead class="table-header">
                         <tr>
-                            <th>NAME</th>
-                            <th>Invited</th>
-                            <th>ACTIVE</th>
-                            <th>INACTIVE</th>
-                            <th>FAKE USERS</th>
-                            <th>Details</th>
+                            <th class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider rounded-tl-xl">NAME</th>
+                            <th class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider">INVITED</th>
+                            <th class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider">ACTIVE</th>
+                            <th class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider">INACTIVE</th>
+                            <th class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider">FAKE USER SAME IP</th>
+                            <th class="px-6 py-3 text-left text-sm font-medium uppercase tracking-wider rounded-tr-xl">DETAILS</th>
                         </tr>
                     </thead>
-                    <tbody id="referral-table-body">
-                        </tbody>
+                    <tbody class="divide-y divide-gray-700" id="referrers-table-body">
+                        <!-- Data will be populated here by JavaScript -->
+                    </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="sidebar">
-            <h2>Live Signups</h2>
-            <div id="globeCanvas"></div>
-            <ul id="live-users-list"></ul>
+        <!-- Details Modal -->
+        <div id="details-modal" class="hidden fixed inset-0 z-50 overflow-auto modal-overlay flex items-center justify-center p-4">
+            <div class="bg-card p-8 m-4 max-w-lg w-full z-50">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl font-bold text-gray-200">Referral Details for <span id="modal-name" class="text-purple-400"></span></h3>
+                    <button id="close-modal" class="text-gray-400 hover:text-white text-3xl font-bold leading-none">&times;</button>
+                </div>
+                <div id="details-list" class="space-y-4">
+                    <!-- Detailed data will be loaded here -->
+                </div>
+            </div>
         </div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Firebase Script and Logic -->
+    <script type="module">
+        // Import necessary Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    <script>
-        // Your Firebase configuration
+        // -----------------------------------------------------------------------
+        // IMPORTANT: Replace the firebaseConfig with your actual details.
+        // -----------------------------------------------------------------------
         const firebaseConfig = {
             apiKey: "AIzaSyEXAMPLE-12345",
             authDomain: "your-project.firebaseapp.com",
-            databaseURL: "https://your-project-default-rtdb.firebaseio.com",
             projectId: "your-project",
             storageBucket: "your-project.appspot.com",
             messagingSenderId: "123456789",
             appId: "1:123456789:web:abcdef12345"
         };
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        
+        // Global variables provided by the canvas environment for Firebase setup.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firestorePath = `artifacts/${appId}/public/data`;
+        const auth = getAuth(initializeApp(firebaseConfig));
+        const db = getFirestore();
+        
+        // Get references to HTML elements
+        const tableBody = document.getElementById('referrers-table-body');
+        const modal = document.getElementById('details-modal');
+        const modalName = document.getElementById('modal-name');
+        const detailsList = document.getElementById('details-list');
+        const closeModalBtn = document.getElementById('close-modal');
 
-        const tableBody = document.getElementById('referral-table-body');
-        const summaryGrid = document.getElementById('summary-grid');
-        const liveUsersList = document.getElementById('live-users-list');
-        const friends = ['NADEEEM', 'IKRAM', 'ShAHID', 'HAFEEZ'];
-        const countryAbbreviations = { /* Add more countries here */ 'USA': 'United States', 'PAK': 'Pakistan', 'IND': 'India' };
+        // Function to show the modal with detailed data
+        function showDetailsModal(name, data) {
+            modalName.textContent = name;
+            detailsList.innerHTML = '';
+            
+            if (data.length === 0) {
+                detailsList.innerHTML = '<p class="text-gray-500">No details found for this referrer.</p>';
+            } else {
+                data.forEach(user => {
+                    const userDiv = document.createElement('div');
+                    userDiv.className = 'bg-gray-700 p-4 rounded-lg shadow-md';
+                    const isFakeText = user.isFake ? '<span class="text-red-400 font-bold">Fake User (Same IP)</span>' : '<span class="text-green-400 font-bold">New User</span>';
+                    const statusText = user.status.charAt(0).toUpperCase() + user.status.slice(1);
+                    userDiv.innerHTML = `
+                        <p class="text-gray-300"><strong>Status:</strong> <span class="text-white">${statusText}</span></p>
+                        <p class="text-gray-300"><strong>Country:</strong> <span class="text-white">${user.country}</span></p>
+                        <p class="text-gray-300"><strong>IP Address:</strong> <span class="text-white">${user.ipAddress}</span></p>
+                        <p class="text-gray-300"><strong>Type:</strong> ${isFakeText}</p>
+                        <p class="text-gray-300"><strong>Joined At:</strong> <span class="text-white">${user.invitedAt.toDate().toLocaleString()}</span></p>
+                    `;
+                    detailsList.appendChild(userDiv);
+                });
+            }
+            modal.classList.remove('hidden');
+        }
 
-        // 3D Globe Animation with Three.js
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, 400 / 400, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(400, 400);
-        document.getElementById('globeCanvas').appendChild(renderer.domElement);
-
-        let globe;
-        const textureLoader = new THREE.TextureLoader();
-        const jsonLoader = new THREE.JSONLoader();
-
-        // Load the globe model and texture
-        jsonLoader.load('earth.json', (geometry) => {
-            textureLoader.load('earth.jpg', (texture) => {
-                const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.95 });
-                globe = new THREE.Mesh(geometry, material);
-                scene.add(globe);
-            });
+        // Handle closing the modal
+        closeModalBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
         });
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-        directionalLight.position.set(0, 1, 1);
-        scene.add(directionalLight);
-
-        camera.position.z = 2.5;
-
-        // Create a pulsating dot
-        const dotMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-        const dotGeometry = new THREE.SphereGeometry(0.02, 16, 16);
-        function addLiveDot(latitude, longitude) {
-            const phi = (90 - latitude) * (Math.PI / 180);
-            const theta = (longitude + 180) * (Math.PI / 180);
-            
-            const x = -(0.5 * Math.sin(phi) * Math.cos(theta));
-            const y = (0.5 * Math.cos(phi));
-            const z = (0.5 * Math.sin(phi) * Math.sin(theta));
-
-            const dot = new THREE.Mesh(dotGeometry, dotMaterial);
-            dot.position.set(x, y, z);
-            scene.add(dot);
-
-            // Animate the dot
-            let scale = 1;
-            let scaleDirection = 0.01;
-            function animateDot() {
-                requestAnimationFrame(animateDot);
-                scale += scaleDirection;
-                if (scale > 1.5 || scale < 1.0) {
-                    scaleDirection *= -1;
-                }
-                dot.scale.set(scale, scale, scale);
-                renderer.render(scene, camera);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
             }
-            animateDot();
-        }
+        });
 
-        function animate() {
-            requestAnimationFrame(animate);
-            if (globe) {
-                globe.rotation.y += 0.002;
+        // Use onSnapshot to listen for real-time updates
+        async function setupRealtimeListeners() {
+            // First, sign in anonymously to satisfy security rules.
+            // This grants read access to the public data path.
+            if (typeof __initial_auth_token !== 'undefined') {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
             }
-            renderer.render(scene, camera);
-        }
-        animate();
 
-        // Firebase Real-time Data
-        database.ref('invited_users').on('value', (snapshot) => {
-            const users = snapshot.val();
-            const referralData = {};
-            
-            friends.forEach(friend => {
-                referralData[friend.toUpperCase()] = { invited: 0, active: 0, inactive: 0, fake: 0, details: {} };
-            });
-
-            tableBody.innerHTML = '';
-            summaryGrid.innerHTML = '';
-            
-            if (users) {
-                Object.values(users).forEach(user => {
-                    const invitedBy = user.invited_by;
-                    if (referralData[invitedBy]) {
-                        referralData[invitedBy].invited++;
-                        if (user.status === 'ACTIVE') {
-                            referralData[invitedBy].active++;
-                        } else {
-                            referralData[invitedBy].inactive++;
-                        }
-                        if (user.isFake) {
-                            referralData[invitedBy].fake++;
-                        }
-                        const country = user.country || 'Unknown';
-                        if (!referralData[invitedBy].details[country]) {
-                            referralData[invitedBy].details[country] = 0;
-                        }
-                        referralData[invitedBy].details[country]++;
-                    }
+            // Listen for changes to the 'referrers' collection
+            const referrersRef = collection(db, `${firestorePath}/referrers`);
+            onSnapshot(referrersRef, async (snapshot) => {
+                const referrersData = [];
+                snapshot.forEach(doc => {
+                    referrersData.push({ id: doc.id, ...doc.data() });
                 });
+                
+                // Sort the data by invited count descending for better visibility
+                referrersData.sort((a, b) => b.invited - a.invited);
 
-                // Populate the main table and summary cards
-                friends.forEach(friend => {
-                    const data = referralData[friend.toUpperCase()];
-                    summaryGrid.innerHTML += `
-                        <div class="card">
-                            <h3>${friend}</h3>
-                            <p>Invited: <span class="value">${data.invited}</span></p>
-                            <p>Active: <span class="value">${data.active}</span></p>
-                            <p>Inactive: <span class="value">${data.inactive}</span></p>
-                            <p>Fake: <span class="value">${data.fake}</span></p>
-                        </div>
-                    `;
+                // Clear the table and repopulate with new data
+                tableBody.innerHTML = '';
+                
+                for (const referrer of referrersData) {
                     const row = document.createElement('tr');
-                    let detailsText = '';
-                    for (const [country, count] of Object.entries(data.details)) {
-                        detailsText += `<b>${country}</b>: ${count}<br>`;
-                    }
+                    row.className = 'table-row text-gray-300 text-sm transform hover:scale-105 transition-transform duration-200';
                     row.innerHTML = `
-                        <td>${friend.toUpperCase()}</td>
-                        <td>${data.invited}</td>
-                        <td>${data.active}</td>
-                        <td>${data.inactive}</td>
-                        <td>${data.fake}</td>
-                        <td>${detailsText}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${referrer.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${referrer.invited}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${referrer.active}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${referrer.inactive}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${referrer.fakeUsers}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button class="btn-details" data-name="${referrer.name}">View Details</button>
+                        </td>
                     `;
                     tableBody.appendChild(row);
-                });
-            }
-        });
 
-        // Live user tracking
-        let lastUserCount = 0;
-        database.ref('invited_users').on('child_added', (snapshot) => {
-            const newUser = snapshot.val();
-            const timestamp = new Date(newUser.timestamp);
-            const timeAgo = (new Date() - timestamp) / 1000;
-            
-            if (timeAgo < 10) { // Only show users who joined in the last 10 seconds
-                // You would need a geo-ip service to get lat/long from the IP for the globe.
-                // For this example, we'll use a random location.
-                const lat = Math.random() * 180 - 90;
-                const long = Math.random() * 360 - 180;
-                addLiveDot(lat, long);
-
-                const li = document.createElement('li');
-                const countryName = countryAbbreviations[newUser.country] || newUser.country || 'Unknown Country';
-                li.innerHTML = `New user joined! Invited by <b>${newUser.invited_by}</b> from <b>${countryName}</b>.`;
-                liveUsersList.prepend(li); // Show the newest user at the top
-                if (liveUsersList.children.length > 5) {
-                    liveUsersList.removeChild(liveUsersList.lastChild);
+                    // Add event listener to the "View Details" button
+                    row.querySelector('.btn-details').addEventListener('click', async () => {
+                        try {
+                            // Fetch all users for this referrer
+                            const usersQuery = query(collection(db, `${firestorePath}/referrals`), where("referrerName", "==", referrer.name));
+                            const usersSnapshot = await getDocs(usersQuery);
+                            const usersData = [];
+                            usersSnapshot.forEach(doc => usersData.push(doc.data()));
+                            
+                            showDetailsModal(referrer.name, usersData);
+                        } catch (e) {
+                            console.error("Error fetching details: ", e);
+                        }
+                    });
                 }
-            }
-        });
+            });
+        }
+        
+        // Start the process on page load
+        window.onload = setupRealtimeListeners;
     </script>
 </body>
 </html>
