@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2756,139 +2757,78 @@
 //TREAKCER
 
 
+    <!-- Referral Tracking – paste near the end of <body> -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
-    <script type="module">
-    // This script handles referral tracking for your website.
-    // It should be placed at the bottom of the <body> tag in your index.html file.
-    // It connects to Firebase to record referral data in real-time.
+// --- Firebase (your project) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDaAMcSZSigXawYiD7ThoB-kXMdoa9cgyY",
+  authDomain: "adwatchrewardsapp.firebaseapp.com",
+  projectId: "adwatchrewardsapp",
+  storageBucket: "adwatchrewardsapp.firebasestorage.app",
+  messagingSenderId: "782268735936",
+  appId: "1:782268735936:web:ea82e5be5d0f44949ba825",
+  measurementId: "G-4NG2564HTK"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-    // -----------------------------------------------------------------------
-    // IMPORTANT: Replace the firebaseConfig with your actual details.
-    // You must get this from your Firebase project settings.
-    // -----------------------------------------------------------------------
-    const firebaseConfig = {
-        apiKey: "AIzaSyEXAMPLE-12345",
-        authDomain: "your-project.firebaseapp.com",
-        projectId: "your-project",
-        storageBucket: "your-project.appspot.com",
-        messagingSenderId: "123456789",
-        appId: "1:123456789:web:abcdef12345"
+// --- Helpers ---
+function getParam(name){
+  const p = new URLSearchParams(window.location.search).get(name);
+  return p ? p.trim() : "";
+}
+async function getVisitor(){
+  try{
+    const res = await fetch("https://ipapi.co/json/");
+    const j = await res.json();
+    return {
+      ip: j.ip || "",
+      country: j.country_name || "",
+      city: j.city || "",
+      region: j.region || ""
     };
+  }catch(e){
+    return { ip:"", country:"", city:"", region:"" };
+  }
+}
+function oncePerSessionKey(ref){ return "ref_logged_"+ref; }
 
-    // Import necessary Firebase modules
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, query, where, getDocs, doc, setDoc, updateDoc, increment, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+// --- Main tracking ---
+(async function track(){
+  const refRaw = getParam("ref");
+  if(!refRaw) return; // only log if ?ref= is present
+  const referrer = refRaw.toLowerCase();
 
-    // Global variables provided by the canvas environment for Firebase setup.
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const firestorePath = `artifacts/${appId}/public/data`;
-    const auth = getAuth(initializeApp(firebaseConfig));
-    const db = getFirestore();
+  // prevent double-count on page refresh in the same tab
+  const key = oncePerSessionKey(referrer);
+  if(sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key,"1");
 
-    // The main function to handle referral logic
-    async function handleReferral() {
-        try {
-            // Sign in anonymously to authenticate with Firestore.
-            if (typeof __initial_auth_token !== 'undefined') {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
+  // try to grab an email if your page already has one in a form
+  // (non-blocking; if not found, it stays "")
+  let email = "";
+  const emailInput = document.querySelector('input[type="email"], input[name="email"], #email');
+  if(emailInput && emailInput.value) email = (emailInput.value || "").trim();
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const referrerName = urlParams.get('ref');
+  const v = await getVisitor();
 
-            // Check if a referral name exists in the URL
-            if (referrerName) {
-                console.log(`Referral detected from: ${referrerName}`);
-
-                // Get user's IP address and location
-                let userCountry = 'Unknown';
-                let userIP = 'Unknown';
-
-                try {
-                    // Fetch IP address
-                    const ipResponse = await fetch('https://api.ipify.org?format=json');
-                    const ipData = await ipResponse.json();
-                    userIP = ipData.ip;
-
-                    // Fetch country from IP
-                    const geoResponse = await fetch(`https://ipapi.co/${userIP}/json/`);
-                    const geoData = await geoResponse.json();
-                    userCountry = geoData.country_name || 'Unknown';
-                } catch (err) {
-                    console.error('Failed to get IP or country.', err);
-                }
-
-                // If country is still unknown, ask the user for it
-                if (userCountry === 'Unknown') {
-                    // Do not use alert() or prompt(), use a custom UI element instead.
-                    // For this example, we'll log a message to the console.
-                    console.log("Country not detected. Please implement a custom modal to ask the user.");
-                }
-
-                // Check for previous visits from the same IP
-                const q = query(collection(db, `${firestorePath}/referrals`), where("ipAddress", "==", userIP));
-                const querySnapshot = await getDocs(q);
-                const isFakeUser = !querySnapshot.empty && userIP !== 'Unknown';
-
-                if (isFakeUser) {
-                    console.warn('Potential fake user detected from the same IP.');
-                } else {
-                    console.log('New user joined via referral.');
-                }
-
-                // Reference to the referrer's document in Firestore
-                const referrerRef = doc(db, `${firestorePath}/referrers`, referrerName.toUpperCase());
-
-                // Check if the referrer exists, create if not
-                const referrerDoc = await getDoc(referrerRef);
-                if (!referrerDoc.exists()) {
-                    await setDoc(referrerRef, {
-                        name: referrerName.toUpperCase(),
-                        invited: 0,
-                        active: 0,
-                        inactive: 0,
-                        fakeUsers: 0
-                    });
-                }
-
-                // Add new user to the 'referrals' collection
-                await addDoc(collection(db, `${firestorePath}/referrals`), {
-                    referrerName: referrerName.toUpperCase(),
-                    invitedAt: new Date(),
-                    ipAddress: userIP,
-                    country: userCountry,
-                    isFake: isFakeUser,
-                    status: 'invited', // This will be 'active' or 'inactive' based on user behavior
-                });
-
-                // Update the referrer's stats
-                if (isFakeUser) {
-                    await updateDoc(referrerRef, {
-                        fakeUsers: increment(1)
-                    });
-                } else {
-                    await updateDoc(referrerRef, {
-                        invited: increment(1)
-                    });
-                }
-
-                console.log('Referral data saved to Firebase!');
-            }
-        } catch (e) {
-            console.error("Error handling referral: ", e);
-        }
-    }
-
-    // Run the function when the page loads
-    window.onload = handleReferral;
+  // Create one visit doc (per visit)
+  await addDoc(collection(db,"referrals"),{
+    referrer,          // normalized (lowercase)
+    referrerRaw: refRaw, // original casing
+    email,             // optional
+    ip: v.ip,
+    country: v.country,
+    city: v.city,
+    region: v.region,
+    ua: navigator.userAgent,
+    ts: serverTimestamp()
+  }).catch(console.error);
+})();
 </script>
-
-
-
-    
 
 </body>
 </html>
